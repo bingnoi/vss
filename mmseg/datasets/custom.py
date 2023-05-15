@@ -1653,7 +1653,11 @@ class CustomDataset_video(Dataset):
         clips_img = []
         clips_target=[]
         clips_meta=[]
-        for i in this_step:
+
+        print('3',imglist)
+
+        for i in imglist:
+        # for i in this_step:
             img_name=imglist[i]
             img_info=dict(filename=img_name)
             seg_map = img_name.replace(img_suffix, seg_map_suffix)
@@ -2176,6 +2180,9 @@ class CustomDataset_video2(Dataset):
         ori_filename_clips, img_clips, img_shape_clips, ori_shape_clips, pad_shape_clips=[],[],[],[],[]
         scale_factor_clips, img_norm_cfg_clips, gt_semantic_seg_clips=[],[],[]
 
+        # print('test',len(imglist[:30:1]))
+
+        # for i in list(range(len(imglist[:30:1]))):
         for i in this_step:
             img_name=imglist[i]
             img_info=dict(filename=img_name)
@@ -2893,7 +2900,10 @@ class CustomDataset_video2_vps(Dataset):
         ori_filename_clips, img_clips, img_shape_clips, ori_shape_clips, pad_shape_clips=[],[],[],[],[]
         scale_factor_clips, img_norm_cfg_clips, gt_semantic_seg_clips=[],[],[]
 
-        for i in this_step:
+        print('2',len(imglist))
+
+        for i in imglist:
+        # for i in this_step:
             img_name=imglist[i]
             img_info=dict(filename=img_name)
             seg_map = img_name.replace(self.img_suffix, self.seg_map_suffix)

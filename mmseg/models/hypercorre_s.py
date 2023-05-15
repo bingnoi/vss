@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import time
 
-# from memory import *
+from memory import *
 
 class CenterPivotConv4d_half(nn.Module):
     r""" CenterPivot 4D conv"""
@@ -350,12 +350,7 @@ class hypercorre_topk2(nn.Module):
         self.hpn1=HPNLearner_topk2([1,1,1], backbone)
         self.hpn2=HPNLearner_topk2([1,1,1], backbone)
 
-        # self.memory = FeatureMemory()
-
-        self.linear1 = nn.Linear(dim[3], dim[3], bias=qkv_bias)
-        self.linear2 = nn.Linear(512, 512, bias=qkv_bias)
-
-        self.memory = nn.Parameter(torch.zeros([1,3,512,15,15]), requires_grad = False)
+        self.memory = FeatureMemory()
 
         self.k_top=5
         if backbone=='b0':
@@ -380,22 +375,8 @@ class hypercorre_topk2(nn.Module):
         query_qkv_all=[]
         query_shape_all=[]
 
-        # B,num_clips,cx,hx,wx=query_frame[0].shape
-        # query_frame_selected = query_frame[0].permute(0,1,3,4,2).reshape(B,num_clips,-1,cx)
 
-        # query_frame_selected = self.linear1(query_frame_selected)
-        # memory_feature = self.linear2(self.memory.data.permute(0,1,3,4,2)).reshape(B,num_clips,-1,cx)
-
-        # # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
-        
-        # atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
-
-        # #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-        # out = torch.matmul(atten,query_frame_selected).reshape(B,num_clips,hx,wx,cx).permute(0,1,4,2,3)
-        
-        # self.memory.data = out
-        # query_frame[0] = out
-
+        # print("ini_k",[i.shape for i in query_frame])
         for ii, query in enumerate(query_frame):
             if ii==0:
                 # print('query cx1 %d %d %d %d %d'%(B,num_ref_clips,cx,hy,wy))
@@ -433,7 +414,6 @@ class hypercorre_topk2(nn.Module):
             # query_qkv_all.append(query.reshape(B,num_ref_clips,cx,hx,wx))       ## B,num_ref_clips,hy*wy,cx
             query_shape_all.append([hx,wx])
             # query_shape_all.append(wy)
-
 
         # print("k",[i.shape for i in query_qkv_all])
         # [torch.Size([1, 3, 330, 512]), torch.Size([1, 3, 330, 320]), torch.Size([1, 3, 330, 128]), torch.Size([1, 3, 330, 64])] 
@@ -797,6 +777,8 @@ class hypercorre_topk2(nn.Module):
         atten_feature_f1 = self.pooling_proj_linear_1(atten_feature_f1)
         atten_feature_f2 = self.pooling_proj_linear_2(atten_feature_f2)
 
+        # last3_features_cat = self.pooling_proj_linear_3(last3_features_cat) 
+
         # print('qq',atten_all.shape,former_t_feature.shape)
         # torch.Size([1, 1, 3600, 330]) torch.Size([1, 1, 330, 256]) --> [1,1,3600,256]
 
@@ -804,9 +786,12 @@ class hypercorre_topk2(nn.Module):
         atten_weight_1 = torch.matmul(atten_all1,atten_feature_f1)
         atten_weight_2 = torch.matmul(atten_all2,atten_feature_f2)
 
-        # query_frame_p = self.linear1(self.memory,dim=0)
-        
-        # [1,1,3600,256]
+        # print('a1 ',atten_weight.shape)
+
+        # atten_weight_inter = torch.matmul(atten_weight,last3_features_cat.transpose(-1,-2))  
+        # atten_weight = torch.matmul(atten_weight_inter,last3_features_cat)
+
+        # print('a2 ',atten_weight.shape)
 
         # st_final = []
         # for ii in range(0,4):

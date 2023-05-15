@@ -229,10 +229,6 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
         self.self_ensemble2=True
 
     def forward(self, inputs, batch_size=None, num_clips=None):
-        # print('a ',len(inputs))
-        # print('b ',inputs[0].shape)
-
-
         #每一层特征下做down_sample,按通道cancat,每一次s*c->s*4c
         start_time=time.time()
         if self.training:
@@ -261,11 +257,7 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
         _, _, h, w=_c.shape
         x = self.dropout(_c)
         x = self.linear_pred(x)
-
         x = x.reshape(batch_size, num_clips, -1, h, w)
-
-        # print('c ',x.shape)
-        # c=input()
 
         # print(x.shape)
         if not self.training and num_clips!=self.num_clips:
@@ -302,17 +294,12 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
         # query_c4=query_c4.reshape(batch_size, (num_clips-1), -1, query_c4.shape[-2], query_c4.shape[-1])
 
         query_frame=[query_c1, query_c2, query_c3, query_c4]
-
-        # print('a',query_c4.shape)
-        # torch.Size([1, 3, 512, 15, 15])
-        # a=input()
-
         supp_frame=[c1[:,-1:], c2[:,-1:], c3[:,-1:], c4[:,-1:]]
         # supp_frame=[c1[-batch_size:].unsqueeze(1), c2[-batch_size:].unsqueeze(1), c3[-batch_size:].unsqueeze(1), c4[-batch_size:].unsqueeze(1)]
         # print('check1',[i.shape for i in query_frame])
         # print('check2',[i.shape for i in supp_frame])
 
-        final_feature = self.hypercorre_module(query_frame,supp_frame)  
+        final_feature = self.hypercorre_module(query_frame,supp_frame)        
 
         supp_feats = final_feature
 
