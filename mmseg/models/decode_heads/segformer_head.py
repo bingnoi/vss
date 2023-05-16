@@ -228,7 +228,7 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
 
         self.self_ensemble2=True
 
-    def forward(self, inputs, batch_size=None, num_clips=None):
+    def forward(self,inputs, batch_size=None, num_clips=None):
         # print('a ',len(inputs))
         # print('b ',inputs[0].shape)
 
@@ -286,6 +286,7 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
         c4=c4.reshape(batch_size, num_clips, -1, c4.shape[-2], c4.shape[-1])
         query_c1, query_c2, query_c3, query_c4=c1[:,:-1], c2[:,:-1], c3[:,:-1], c4[:,:-1]
         # remove last frame
+        
         
         # query_c2=query_c2.reshape(batch_size*(num_clips-1), -1, shape_c2[0], shape_c2[1])
         # query_c3=query_c3.reshape(batch_size*(num_clips-1), -1, shape_c3[0], shape_c3[1])

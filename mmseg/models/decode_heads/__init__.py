@@ -20,6 +20,7 @@ from .sep_aspp_head import DepthwiseSeparableASPPHead
 from .sep_fcn_head import DepthwiseSeparableFCNHead
 from .uper_head import UPerHead
 
+from .segformer_interval import SegFormerHead_clips
 
 from .segformer_head import SegFormerHead
 
@@ -28,5 +29,5 @@ __all__ = [
     'UPerHead', 'DepthwiseSeparableASPPHead', 'ANNHead', 'DAHead', 'OCRHead',
     'EncHead', 'DepthwiseSeparableFCNHead', 'FPNHead', 'EMAHead', 'DNLHead',
     'PointHead', 'APCHead', 'DMHead', 'LRASPPHead',
-    'SegFormerHead',
+    'SegFormerHead','SegFormerHead_clips'
 ]

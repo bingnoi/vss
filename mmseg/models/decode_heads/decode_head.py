@@ -49,6 +49,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                  channels,
                  *,
                  num_classes,
+                 num_infer,
                  dropout_ratio=0.1,
                  conv_cfg=None,
                  norm_cfg=None,
@@ -67,6 +68,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         self._init_inputs(in_channels, in_index, input_transform)
         self.channels = channels
         self.num_classes = num_classes
+        self.num_infer = num_infer,
         self.dropout_ratio = dropout_ratio
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
@@ -279,6 +281,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                  channels,
                  *,
                  num_classes,
+                 num_infer,
                  dropout_ratio=0.1,
                  conv_cfg=None,
                  norm_cfg=None,
@@ -300,6 +303,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         super(BaseDecodeHead_clips, self).__init__()
         self._init_inputs(in_channels, in_index, input_transform)
         self.channels = channels
+        self.num_infer = num_infer,
         self.num_classes = num_classes
         self.dropout_ratio = dropout_ratio
         self.conv_cfg = conv_cfg
@@ -426,6 +430,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
+        
         seg_logits = self.forward(inputs,batch_size, num_clips)
         losses = self.losses(seg_logits, gt_semantic_seg)
         return losses

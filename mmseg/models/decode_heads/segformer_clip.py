@@ -24,8 +24,6 @@ import time
 from ..builder import build_loss
 from torch.nn import functional as F
 
-from memory import *
-
 
 class MLP(nn.Module):
     """
@@ -41,76 +39,76 @@ class MLP(nn.Module):
         return x
 
 
-@HEADS.register_module()
-class SegFormerHead(BaseDecodeHead):
-    """
-    SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers
-    """
-    def __init__(self, feature_strides, **kwargs):
-        super(SegFormerHead, self).__init__(input_transform='multiple_select', **kwargs)
-        assert len(feature_strides) == len(self.in_channels)
-        assert min(feature_strides) == feature_strides[0]
-        self.feature_strides = feature_strides
+# @HEADS.register_module()
+# class SegFormerHead(BaseDecodeHead):
+#     """
+#     SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers
+#     """
+#     def __init__(self, feature_strides, **kwargs):
+#         super(SegFormerHead, self).__init__(input_transform='multiple_select', **kwargs)
+#         assert len(feature_strides) == len(self.in_channels)
+#         assert min(feature_strides) == feature_strides[0]
+#         self.feature_strides = feature_strides
 
-        c1_in_channels, c2_in_channels, c3_in_channels, c4_in_channels = self.in_channels
+#         c1_in_channels, c2_in_channels, c3_in_channels, c4_in_channels = self.in_channels
 
-        decoder_params = kwargs['decoder_params']
-        embedding_dim = decoder_params['embed_dim']
+#         decoder_params = kwargs['decoder_params']
+#         embedding_dim = decoder_params['embed_dim']
 
 
-        self.linear_c4 = MLP(input_dim=c4_in_channels, embed_dim=embedding_dim)
-        self.linear_c3 = MLP(input_dim=c3_in_channels, embed_dim=embedding_dim)
-        self.linear_c2 = MLP(input_dim=c2_in_channels, embed_dim=embedding_dim)
-        self.linear_c1 = MLP(input_dim=c1_in_channels, embed_dim=embedding_dim)
+#         self.linear_c4 = MLP(input_dim=c4_in_channels, embed_dim=embedding_dim)
+#         self.linear_c3 = MLP(input_dim=c3_in_channels, embed_dim=embedding_dim)
+#         self.linear_c2 = MLP(input_dim=c2_in_channels, embed_dim=embedding_dim)
+#         self.linear_c1 = MLP(input_dim=c1_in_channels, embed_dim=embedding_dim)
 
-        self.linear_fuse = ConvModule(
-            in_channels=embedding_dim*4,
-            out_channels=embedding_dim,
-            kernel_size=1,
-            # norm_cfg=dict(type='SyncBN', requires_grad=True)
-            norm_cfg=dict(type='GN', num_groups=1)
-        )
+#         self.linear_fuse = ConvModule(
+#             in_channels=embedding_dim*4,
+#             out_channels=embedding_dim,
+#             kernel_size=1,
+#             # norm_cfg=dict(type='SyncBN', requires_grad=True)
+#             norm_cfg=dict(type='GN', num_groups=1)
+#         )
 
-        self.linear_pred = nn.Conv2d(embedding_dim, self.num_classes, kernel_size=1)
+#         self.linear_pred = nn.Conv2d(embedding_dim, self.num_classes, kernel_size=1)
 
-    def encode_key(self, frame, need_sk=True, need_ek=True): 
-        return
+#     def encode_key(self, frame, need_sk=True, need_ek=True): 
+#         return
 
-    def encode_value(self, frame, image_feat_f16, h16, masks, is_deep_update=True): 
-        return
+#     def encode_value(self, frame, image_feat_f16, h16, masks, is_deep_update=True): 
+#         return
     
-    def update_memory(self, query_key, query_selection, memory_key, 
-                    memory_shrinkage, memory_value):
-        return
+#     def update_memory(self, query_key, query_selection, memory_key, 
+#                     memory_shrinkage, memory_value):
+#         return
 
-    def forward(self, inputs):
-        x = self._transform_inputs(inputs)  # len=4, 1/4,1/8,1/16,1/32
-        c1, c2, c3, c4 = x
+#     def forward(self, inputs):
+#         x = self._transform_inputs(inputs)  # len=4, 1/4,1/8,1/16,1/32
+#         c1, c2, c3, c4 = x
 
-        print(c1.shape, c2.shape, c3.shape, c4.shape)
+#         print(c1.shape, c2.shape, c3.shape, c4.shape)
 
-        ############## MLP decoder on C1-C4 ###########
-        n, _, h, w = c4.shape
+#         ############## MLP decoder on C1-C4 ###########
+#         n, _, h, w = c4.shape
 
-        _c4 = self.linear_c4(c4).permute(0,2,1).reshape(n, -1, c4.shape[2], c4.shape[3])
-        _c4 = resize(_c4, size=c1.size()[2:],mode='bilinear',align_corners=False)
+#         _c4 = self.linear_c4(c4).permute(0,2,1).reshape(n, -1, c4.shape[2], c4.shape[3])
+#         _c4 = resize(_c4, size=c1.size()[2:],mode='bilinear',align_corners=False)
 
-        _c3 = self.linear_c3(c3).permute(0,2,1).reshape(n, -1, c3.shape[2], c3.shape[3])
-        _c3 = resize(_c3, size=c1.size()[2:],mode='bilinear',align_corners=False)
+#         _c3 = self.linear_c3(c3).permute(0,2,1).reshape(n, -1, c3.shape[2], c3.shape[3])
+#         _c3 = resize(_c3, size=c1.size()[2:],mode='bilinear',align_corners=False)
 
-        _c2 = self.linear_c2(c2).permute(0,2,1).reshape(n, -1, c2.shape[2], c2.shape[3])
-        _c2 = resize(_c2, size=c1.size()[2:],mode='bilinear',align_corners=False)
+#         _c2 = self.linear_c2(c2).permute(0,2,1).reshape(n, -1, c2.shape[2], c2.shape[3])
+#         _c2 = resize(_c2, size=c1.size()[2:],mode='bilinear',align_corners=False)
 
-        _c1 = self.linear_c1(c1).permute(0,2,1).reshape(n, -1, c1.shape[2], c1.shape[3])
+#         _c1 = self.linear_c1(c1).permute(0,2,1).reshape(n, -1, c1.shape[2], c1.shape[3])
 
-        _c = self.linear_fuse(torch.cat([_c4, _c3, _c2, _c1], dim=1))
+#         _c = self.linear_fuse(torch.cat([_c4, _c3, _c2, _c1], dim=1))
 
-        x = self.dropout(_c)
-        x = self.linear_pred(x)
+#         x = self.dropout(_c)
+#         x = self.linear_pred(x)
 
-        # print(torch.cuda.memory_allocated(0))
+#         # print(torch.cuda.memory_allocated(0))
 
-        return x
+#         return x
 
 class pooling_mhsa(nn.Module):
     def __init__(self,dim):
@@ -211,7 +209,7 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
 
         self.linear_pred = nn.Conv2d(embedding_dim, self.num_classes, kernel_size=1)
 
-        self.memory_module = FeatureMemory()
+        # self.memory_module = FeatureMemory()
 
         # self.linear_pred2 = nn.Conv2d(embedding_dim, self.num_classes, kernel_size=1)
 
@@ -252,42 +250,42 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         else:
             raise NotImplementedError
     
-    def init_memory(self,):
-        B,num_clips,cx,hx,wx=query_frame[0].shape
-        query_frame_selected = query_frame[0].permute(0,1,3,4,2).reshape(B,num_clips,-1,cx)
+    # def init_memory(self,):
+    #     B,num_clips,cx,hx,wx=query_frame[0].shape
+    #     query_frame_selected = query_frame[0].permute(0,1,3,4,2).reshape(B,num_clips,-1,cx)
 
-        query_frame_selected = self.linear1(query_frame_selected)
-        memory_feature = self.linear2(self.memory.data.permute(0,1,3,4,2)).reshape(B,num_clips,-1,cx)
+    #     query_frame_selected = self.linear1(query_frame_selected)
+    #     memory_feature = self.linear2(self.memory.data.permute(0,1,3,4,2)).reshape(B,num_clips,-1,cx)
 
-        # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
+    #     # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
         
-        atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
+    #     atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
 
-        #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-        out = torch.matmul(atten,query_frame_selected).reshape(B,num_clips,hx,wx,cx).permute(0,1,4,2,3)
+    #     #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
+    #     out = torch.matmul(atten,query_frame_selected).reshape(B,num_clips,hx,wx,cx).permute(0,1,4,2,3)
         
-        self.memory.data = out
-        query_frame[0] = out
+    #     self.memory.data = out
+    #     query_frame[0] = out
 
-    def update_memory(self,inputs):
-        B,num_clips,cx,hx,wx=query_frame[0].shape
-        query_frame_selected = query_frame[0].permute(0,1,3,4,2).reshape(B,num_clips,-1,cx)
+    # def update_memory(self,inputs):
+    #     B,num_clips,cx,hx,wx=query_frame[0].shape
+    #     query_frame_selected = query_frame[0].permute(0,1,3,4,2).reshape(B,num_clips,-1,cx)
 
-        query_frame_selected = self.linear1(query_frame_selected)
-        memory_feature = self.linear2(self.memory.data.permute(0,1,3,4,2)).reshape(B,num_clips,-1,cx)
+    #     query_frame_selected = self.linear1(query_frame_selected)
+    #     memory_feature = self.linear2(self.memory.data.permute(0,1,3,4,2)).reshape(B,num_clips,-1,cx)
 
-        # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
+    #     # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
         
-        atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
+    #     atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
 
-        #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-        out = torch.matmul(atten,query_frame_selected).reshape(B,num_clips,hx,wx,cx).permute(0,1,4,2,3)
+    #     #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
+    #     out = torch.matmul(atten,query_frame_selected).reshape(B,num_clips,hx,wx,cx).permute(0,1,4,2,3)
         
-        self.memory.data = out
-        query_frame[0] = out
+    #     self.memory.data = out
+    #     query_frame[0] = out
         
 
-    def forward_features(self, inputs, batch_size=None, num_clips=None):
+    def forward_features(self,feats,inputs, batch_size=None, num_clips=None):
         #每一层特征下做down_sample,按通道cancat,每一次s*c->s*4c
         start_time=time.time()
         if self.training:
@@ -357,6 +355,8 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # supp_frame=[c1[-batch_size:].unsqueeze(1), c2[-batch_size:].unsqueeze(1), c3[-batch_size:].unsqueeze(1), c4[-batch_size:].unsqueeze(1)]
         # print('check1',[i.shape for i in query_frame])
         # print('check2',[i.shape for i in supp_frame])
+        
+        print("f ",feats.shape)
 
         final_feature = self.hypercorre_module(query_frame,supp_frame) 
 

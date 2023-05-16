@@ -393,8 +393,8 @@ class hypercorre_topk2(nn.Module):
         # #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
         # out = torch.matmul(atten,query_frame_selected).reshape(B,num_clips,hx,wx,cx).permute(0,1,4,2,3)
         
-        # self.memory.data = out
-        # query_frame[0] = out
+        self.memory.data = out
+        query_frame[0] = out
 
         for ii, query in enumerate(query_frame):
             if ii==0:
