@@ -175,11 +175,12 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
     SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers
     use hypercorrection in hsnet
     """
-    def __init__(self, feature_strides, **kwargs):
+    def __init__(self, feature_strides,dim=[64, 128, 320, 512], **kwargs):
         super(SegFormerHead_clipsNet, self).__init__(input_transform='multiple_select', **kwargs)
         assert len(feature_strides) == len(self.in_channels)
         assert min(feature_strides) == feature_strides[0]
         self.feature_strides = feature_strides
+        self.dim=dim
 
         c1_in_channels, c2_in_channels, c3_in_channels, c4_in_channels = self.in_channels
 
@@ -212,6 +213,9 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # self.memory_module = FeatureMemory()
 
         # self.linear_pred2 = nn.Conv2d(embedding_dim, self.num_classes, kernel_size=1)
+        
+        self.linear1 = nn.Linear(dim[3],dim[3],bias=True)
+        self.linear2 = nn.Linear(dim[3],dim[3],bias=True)
 
         self.deco1=small_decoder2(embedding_dim,256, self.num_classes)
         self.deco2=small_decoder2(embedding_dim,512, self.num_classes)
@@ -223,8 +227,6 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # self.deco4=small_decoder2(embedding_dim,256, self.num_classes)
 
         self.hypercorre_module=hypercorre_topk2(dim=self.in_channels, backbone=self.backbone)
-
-        self.memory = nn.Parameter(torch.zeros([1,3,512,15,15]), requires_grad = False)
 
         reference_size="1_32"   ## choices: 1_32, 1_16
         if reference_size=="1_32":
@@ -287,6 +289,9 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
 
     def forward_features(self,feats,inputs, batch_size=None, num_clips=None):
         #每一层特征下做down_sample,按通道cancat,每一次s*c->s*4c
+        # print('a ',len(inputs))
+        # print('b ',inputs[0].shape)
+        
         start_time=time.time()
         if self.training:
             assert self.num_clips==num_clips
@@ -294,6 +299,9 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         c1, c2, c3, c4 = x
 
         ############## MLP decoder on C1-C4 ###########
+        # print(c4.shape)
+        # torch.Size([2048, 15, 15])
+        
         n, _, h, w = c4.shape
 
         _c4 = self.linear_c4(c4).permute(0,2,1).reshape(n, -1, c4.shape[2], c4.shape[3])
@@ -349,25 +357,33 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # query_c3=query_c3.reshape(batch_size, (num_clips-1), -1, query_c3.shape[-2], query_c3.shape[-1])
         
         # query_c4=query_c4.reshape(batch_size, (num_clips-1), -1, query_c4.shape[-2], query_c4.shape[-1])
+        
+        B,num_clips_select,cx,hx,wx=query_c4.shape
+        
+        for i in range(num_clips_select):
+            query_frame_selected = query_c4[:,i].permute(0,2,3,1).reshape(B,-1,cx)
+            query_frame_selected = self.linear1(query_frame_selected) #b,-1,cx
+            
+            # feats = feats.unsqueeze(0)
+            # B,feats_num_clips,cx,hx,wx=feats.shape 
+            B,cx,hx,wx=feats.shape 
+            memory_feature = self.linear2(feats.permute(0,2,3,1)).reshape(B,-1,cx)
+
+            # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
+            
+            atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
+
+            #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
+            query_c4[:,i] = torch.matmul(atten,query_frame_selected).reshape(B,hx,wx,cx).permute(0,3,1,2)
+            
 
         query_frame=[query_c1, query_c2, query_c3, query_c4]
         supp_frame=[c1[:,-1:], c2[:,-1:], c3[:,-1:], c4[:,-1:]]
         # supp_frame=[c1[-batch_size:].unsqueeze(1), c2[-batch_size:].unsqueeze(1), c3[-batch_size:].unsqueeze(1), c4[-batch_size:].unsqueeze(1)]
         # print('check1',[i.shape for i in query_frame])
         # print('check2',[i.shape for i in supp_frame])
-        
-        print("f ",feats.shape)
 
         final_feature = self.hypercorre_module(query_frame,supp_frame) 
-
-        #先把所有的特征cat一起，然后与feature_memory进行attention 融合
-        query_frame_p = self.linear1(torch.cat(query_c4,dim=0))
-
-        memory_p = self.linear2(memory_feature)
-
-        atten_weight = torch.matmul(memory_p,query_frame_p)
-
-        memory_feature = torch.matmul(atten_weight,query_frame_p)
 
         ####生成attention——weight
 
@@ -409,7 +425,12 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         h2=int(h/2)
         w2=int(w/2)
         # # h3,w3=shape_c3[-2], shape_c3[-1]
+        
+        
         _c2 = resize(_c, size=(h2,w2),mode='bilinear',align_corners=False)
+        
+        # print('c21',_c2.shape,batch_size,num_clips,h2,w2)
+        
         _c2_split=_c2.reshape(batch_size, num_clips, -1, h2, w2)
 
         # # _c_further=_c2[:,:-1].reshape(batch_size, num_clips-1, -1, h3*w3)
@@ -430,7 +451,7 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
 
         supp_feats = [ supp.transpose(-2,-1).reshape(batch_size,-1, self.embeding, h2,w2) for supp in supp_feats ]
         
-        new_supp =  []
+        new_supp = []
 
         for i in range(0,3):
             new_supp.append(torch.cat([supp_feats[i],_c2_split[:,i+1:i+2]],dim=2))
@@ -442,6 +463,7 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         supp_feats=[ii.squeeze(1) for ii in supp_feats]
 
         outs=supp_feats
+        
 
         # ends here !!!!!!
 

@@ -40,24 +40,32 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
 
     def forward(self, inputs,batch_size=None, num_clips=None):
         #每隔四帧做一次预测，每隔5帧交互生成一次memory_feature
-        # if self.mode == 'TRAIN':
-        #     for i,frame in enumerate(self.nums_frames):
-        #         if i == 0:
-        #             self.net(mode='init_memory',inputs=inputs)
-        #         if i%self.num_infer==0:
-        #             self.net(mode ='update_memory',inputs=inputs)
-        #         out = self.net(mode='segment',inputs=inputs)
-        # return out
         
 
         # if self.mode == 'TRAIN':
-        for i,frame in enumerate(inputs):
+        # print('1len ',len(inputs))
+        
+        num_infer = self.num_infer[0]
+        
+        # print(inputs[0].shape)
+        
+        frame_len = inputs[0].shape[0]
+            
+        for i in range(frame_len-10):
             if i == 0:
-                memoryFeature = self.memory(mode='init_memory',feats=inputs[0:5])
-            if i%self.num_infer==0:
+                memoryFeature = self.memory(mode='init_memory',feats=inputs[-1][:5,:])
+            if i%num_infer==0 and i>num_infer:
                 num_digit = i / 10
                 num_decimal = i % 10
                 carry = 1 if num_decimal>=5 else 0
-                memoryFeature = self.memory(mode ='update_memory',feats=inputs[num_digit*10+carry*5:num_digit*10+carry*5+5])
-            out = self.net(mode='segment',feats=memoryFeature,inputs=inputs[i:i+10:3],batch_size=1,num_clips=4)
-        return out
+                print(num_digit*10+carry*5)
+                memoryFeature = self.memory(mode ='update_memory',feats=inputs[-1][num_digit*10+carry*5-5:num_digit*10+carry*5,:])
+            frame_in = []
+            for sh in range(4):
+                # for q in range(i,i+10,3):
+                frame_in.append(torch.stack([inputs[sh][q,:] for q in range(i,i+10,3)],dim=0))
+            out = self.net(mode='segment',feats=memoryFeature,inputs=frame_in,batch_size=1,num_clips=4)
+            
+            # print(out.shape)
+            # torch.Size([1, 8, 124, 120, 120])
+            return out

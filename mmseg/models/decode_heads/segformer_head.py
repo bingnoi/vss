@@ -229,8 +229,10 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
         self.self_ensemble2=True
 
     def forward(self,inputs, batch_size=None, num_clips=None):
+        
         # print('a ',len(inputs))
         # print('b ',inputs[0].shape)
+        # torch.Size([30, 64, 120, 120])
 
 
         #每一层特征下做down_sample,按通道cancat,每一次s*c->s*4c
@@ -242,6 +244,9 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
 
         ############## MLP decoder on C1-C4 ###########
         n, _, h, w = c4.shape
+        # print(c4.shape)
+        # torch.Size([30, 512, 15, 15])
+        # a=input()
 
         _c4 = self.linear_c4(c4).permute(0,2,1).reshape(n, -1, c4.shape[2], c4.shape[3])
         _c4 = resize(_c4, size=c1.size()[2:],mode='bilinear',align_corners=False)
@@ -312,6 +317,7 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
         # supp_frame=[c1[-batch_size:].unsqueeze(1), c2[-batch_size:].unsqueeze(1), c3[-batch_size:].unsqueeze(1), c4[-batch_size:].unsqueeze(1)]
         # print('check1',[i.shape for i in query_frame])
         # print('check2',[i.shape for i in supp_frame])
+        
 
         final_feature = self.hypercorre_module(query_frame,supp_frame)  
 
@@ -354,7 +360,12 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
         w2=int(w/2)
         # # h3,w3=shape_c3[-2], shape_c3[-1]
         _c2 = resize(_c, size=(h2,w2),mode='bilinear',align_corners=False)
+        
+        # print('c21',_c2.shape,batch_size,num_clips,h2,w2)
+        # c21 torch.Size([4, 256, 60, 60]) 1 4 60 60
+        
         _c2_split=_c2.reshape(batch_size, num_clips, -1, h2, w2)
+        
 
         # # _c_further=_c2[:,:-1].reshape(batch_size, num_clips-1, -1, h3*w3)
         # _c3=self.sr1_feat(_c2)
@@ -446,6 +457,7 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
 
         # print("test ok")
         # a=input()
+        
 
         if not self.training:
             # return output.squeeze(1)
@@ -455,6 +467,9 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
             # return F.softmax(torch.cat([out1,out2,out3,out4],1),dim=2).sum(1)
             # return torch.cat([out1,out2,out3,out4],1).mean(1)
 
+        # print('o ',output.shape)
+        # torch.Size([1, 8, 124, 120, 120])
+        
         return output
 
    

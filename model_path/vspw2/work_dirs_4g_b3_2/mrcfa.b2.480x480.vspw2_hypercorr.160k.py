@@ -17,6 +17,7 @@ model = dict(
         decoder_params=dict(embed_dim=256),
         loss_decode=dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
+        num_infer=5,
         num_clips=4,
         hypercorre=True,
         backbone='b2'),

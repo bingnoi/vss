@@ -281,7 +281,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                  channels,
                  *,
                  num_classes,
-                 num_infer,
+                 num_infer=5,
                  dropout_ratio=0.1,
                  conv_cfg=None,
                  norm_cfg=None,
