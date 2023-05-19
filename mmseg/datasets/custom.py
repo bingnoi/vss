@@ -2182,8 +2182,8 @@ class CustomDataset_video2(Dataset):
 
         # print('test',len(imglist[:30:1]))
 
-        # for i in list(range(len(imglist[:30:1]))):
-        for i in this_step:
+        for i in list(range(len(imglist[:10:1]))):
+        # for i in this_step:
             img_name=imglist[i]
             img_info=dict(filename=img_name)
             seg_map = img_name.replace(self.img_suffix, self.seg_map_suffix)

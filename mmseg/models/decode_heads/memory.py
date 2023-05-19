@@ -11,7 +11,6 @@ class FeatureMemory(nn.Module):
         # self.memory = nn.Parameter(torch.zeros([1,5,512,15,15]), requires_grad = False)
         self.memory = nn.Parameter(torch.zeros([1,512,15,15]), requires_grad = False)
         self.linearfuse1 = nn.Linear(5*512,512)
-        self.linearfuse2 = nn.Linear(5*512,512)
         
         self.linear1 = nn.Linear(512,512)
         self.linear2 = nn.Linear(512,512)
@@ -22,7 +21,6 @@ class FeatureMemory(nn.Module):
         feats = feats.reshape(b,-1,hx,wx).permute(0,2,3,1)
         feats = self.linearfuse1(feats)
         feats = feats.permute(0,3,1,2) 
-        
         
         self.memory.data = feats
         return self.memory.data

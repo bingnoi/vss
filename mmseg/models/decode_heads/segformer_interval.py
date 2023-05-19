@@ -50,6 +50,8 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         # print(inputs[0].shape)
         
         frame_len = inputs[0].shape[0]
+        
+        out_to = []
             
         for i in range(frame_len-10):
             if i == 0:
@@ -62,10 +64,13 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
                 memoryFeature = self.memory(mode ='update_memory',feats=inputs[-1][num_digit*10+carry*5-5:num_digit*10+carry*5,:])
             frame_in = []
             for sh in range(4):
-                # for q in range(i,i+10,3):
                 frame_in.append(torch.stack([inputs[sh][q,:] for q in range(i,i+10,3)],dim=0))
             out = self.net(mode='segment',feats=memoryFeature,inputs=frame_in,batch_size=1,num_clips=4)
             
+            # print('o ',out.shape)
+            out_to.append(out)
+            
             # print(out.shape)
             # torch.Size([1, 8, 124, 120, 120])
-            return out
+        out = torch.cat(out_to,dim=1)
+        return out
