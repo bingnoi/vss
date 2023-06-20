@@ -273,6 +273,8 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
         # c=input()
 
         # print(x.shape)
+        
+        # print(self.training,num_clips,self.num_clips)
         if not self.training and num_clips!=self.num_clips:
         # if not self.training:
             return x[:,-1]

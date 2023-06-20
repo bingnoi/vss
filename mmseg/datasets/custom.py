@@ -2008,6 +2008,7 @@ class CustomDataset_video2(Dataset):
     def __len__(self):
         """Total number of samples of data."""
         # return len(self.img_infos)
+        
         if self.split=='train':
             return len(self.videolists)
         else:
@@ -2181,8 +2182,10 @@ class CustomDataset_video2(Dataset):
         scale_factor_clips, img_norm_cfg_clips, gt_semantic_seg_clips=[],[],[]
 
         # print('test',len(imglist[:30:1]))
+        # print('ttt ',len(self.videolists))
+        # print('see',len(imglist))
 
-        for i in list(range(len(imglist[:10:1]))):
+        for i in list(range(len(imglist[0:11:1]))):
         # for i in this_step:
             img_name=imglist[i]
             img_info=dict(filename=img_name)

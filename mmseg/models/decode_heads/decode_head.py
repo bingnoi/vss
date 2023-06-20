@@ -433,6 +433,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         
         seg_logits = self.forward(inputs,batch_size, num_clips)
         losses = self.losses(seg_logits, gt_semantic_seg)
+        # print('hello ')
         return losses
 
     def forward_test(self, inputs, img_metas, test_cfg, batch_size=None, num_clips=None):
@@ -487,6 +488,8 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
 
         # print(seg_logit.shape, seg_label.shape)
         # torch.Size([1, 10, 124, 120, 120]) torch.Size([1, 20, 1, 480, 480])
+        
+        # num_selected_by = 15
 
         assert seg_logit.dim()==5 and seg_label.dim()==5
 
@@ -509,8 +512,12 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips,1,h,w).reshape(batch_size*(num_clips),1,h,w)
         elif self.hypercorre:
             # print("here2")
+            
+            # print(seg_label.shape[1],seg_logit.shape[1])
             # print(self.self_ensemble2,seg_logit.shape[1],seg_label.shape[1])
             # torch.Size([10, 1, 5, 124, 120, 120]) torch.Size([1, 20, 1, 480, 480])
+            frame_gap = 2
+            frame_gap_l = frame_gap*3+1
             
             # if self.self_ensemble2 and seg_logit.shape[1]==2*seg_label.shape[1]:
             if self.self_ensemble2 and seg_logit.shape[1]==seg_label.shape[1] + 4:
@@ -540,22 +547,29 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
 
                 seg_label_lastframe = seg_label[:,-1:].reshape(batch_size,-1,h,w)
 
-            elif seg_label.shape[1] == 20:
+            elif seg_label.shape[1] > 4:
+            # elif seg_label.shape[1] == num_selected_by:
                 frame_len = seg_label.shape[1]
                 frame_selected = []
-                for i in range(frame_len-10):
-                    frame_selected.append(list(range(i,i+10,3))[3])
+                for i in range(frame_len-frame_gap_l):
+                    frame_selected.append(list(range(i,i+frame_gap_l,frame_gap))[3])
                 
-                print(len(frame_selected))
+                # print(len(frame_selected))
                 seg_label_selected = seg_label[:,frame_selected]
             
                 batch_size, num_clips, chan, h ,w=seg_label_selected.shape
                 
-                print(num_clips,seg_logit.shape[1])
+                seg_label_ori = seg_label_selected.reshape(batch_size*num_clips,1,h,w)
+                
+                # print(num_clips,seg_logit.shape[1])
                 
                 assert num_clips == seg_logit.shape[1]
                 
-                seg_label_ori=seg_label_selected.reshape(batch_size*(num_clips),1,h,w)
+                num_clips=seg_label_selected.shape[1]
+                batch_size, _, _, h ,w=seg_logit.shape
+
+                # print('11111',seg_logit.shape)
+                seg_logit_ori=seg_logit.reshape(batch_size*(num_clips),-1,h,w)
 
             else:
                 assert False, "parameters not correct"            
@@ -567,6 +581,8 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         # 一个是x,剩下那个是out1...4
         
         if seg_label.shape[1] == 4:
+            # print(seg_logit_ori.shape,seg_label.shape[3:])
+            # torch.Size([4, 124, 120, 120]) torch.Size([480, 480])
         
             seg_logit_ori = resize(
                 input=seg_logit_ori,
@@ -619,9 +635,11 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             loss['acc_seg'] = accuracy(seg_logit_ori, seg_label_ori)
 
         else:
-            print(seg_logit.shape,seg_label.shape[3:])
+            # print(seg_logit_ori.shape,seg_label.shape[3:])
+            # torch.Size([1, 10, 124, 120, 120])  torch.Size([480, 480])
+            
             seg_logit_ori = resize(
-                input=seg_logit,
+                input=seg_logit_ori,
                 size=seg_label.shape[3:],
                 mode='bilinear',
                 align_corners=self.align_corners)
@@ -631,20 +649,26 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             else:
                 seg_weight = None
 
-            seg_label_selected = seg_label_selected.squeeze(1)
+            seg_label_ori = seg_label_ori.squeeze(1)
+            # seg_label_selected = 
 
             # print('lll',seg_logit_ori.shape, seg_logit_lastframe.shape)
             # print('mmmm',seg_label_ori.shape, seg_label_lastframe.shape)
             # print('q',seg_weight.shape)
+            
+            # print('s',seg_logit_ori.shape,seg_label_selected.shape)
+            # torch.Size([5, 124, 480, 480]) torch.Size([1, 5, 1, 480, 480])
 
             loss['loss_seg'] = self.loss_decode(
                 seg_logit_ori,
-                seg_label_selected,
+                seg_label_ori,
                 weight=seg_weight,
                 ignore_index=self.ignore_index)
 
-            loss['acc_seg'] = accuracy(seg_logit_ori, seg_label_selected)
+            loss['acc_seg'] = accuracy(seg_logit_ori, seg_label_ori)
 
+        # print('yes')
+        # print(loss['loss_seg'].shape,loss['acc_seg'].shape)
         return loss
 
 

@@ -62,6 +62,7 @@ def train_segmentor(model,
             model.cuda(),
             device_ids=[torch.cuda.current_device()],
             broadcast_buffers=False,
+            # broadcast_buffers=True,
             find_unused_parameters=find_unused_parameters)
     else:
         model = MMDataParallel(

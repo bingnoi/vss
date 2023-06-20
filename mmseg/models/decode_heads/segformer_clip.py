@@ -360,21 +360,22 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         
         B,num_clips_select,cx,hx,wx=query_c4.shape
         
-        for i in range(num_clips_select):
-            query_frame_selected = query_c4[:,i].permute(0,2,3,1).reshape(B,-1,cx)
-            query_frame_selected = self.linear1(query_frame_selected) #b,-1,cx
-            
-            # feats = feats.unsqueeze(0)
-            # B,feats_num_clips,cx,hx,wx=feats.shape 
-            B,cx,hx,wx=feats.shape 
-            memory_feature = self.linear2(feats.permute(0,2,3,1)).reshape(B,-1,cx)
+        if self.training:
+            for i in range(num_clips_select):
+                query_frame_selected = query_c4[:,i].permute(0,2,3,1).reshape(B,-1,cx)
+                query_frame_selected = self.linear1(query_frame_selected) #b,-1,cx
+                
+                # feats = feats.unsqueeze(0)
+                # B,feats_num_clips,cx,hx,wx=feats.shape 
+                B,cx,hx,wx=feats.shape 
+                memory_feature = self.linear2(feats.permute(0,2,3,1)).reshape(B,-1,cx)
 
-            # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
-            
-            atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
+                # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
+                
+                atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
 
-            #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-            query_c4[:,i] = torch.matmul(atten,query_frame_selected).reshape(B,hx,wx,cx).permute(0,3,1,2)
+                #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
+                query_c4[:,i] = torch.matmul(atten,query_frame_selected).reshape(B,hx,wx,cx).permute(0,3,1,2)
             
 
         query_frame=[query_c1, query_c2, query_c3, query_c4]

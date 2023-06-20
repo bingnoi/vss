@@ -157,6 +157,8 @@ class EncoderDecoder(BaseSegmentor):
         loss_decode = self._decode_head_forward_train(x, img_metas,
                                                       gt_semantic_seg)
         losses.update(loss_decode)
+        
+        # print('update yes!')
 
         if self.with_auxiliary_head:
             loss_aux = self._auxiliary_head_forward_train(
@@ -384,6 +386,8 @@ class EncoderDecoder_clips(BaseSegmentor):
         loss_decode = self.decode_head.forward_train(x, img_metas,
                                                      gt_semantic_seg,
                                                      self.train_cfg,batch_size, num_clips)
+        
+        # print("check1")
 
         losses.update(add_prefix(loss_decode, 'decode'))
         return losses
@@ -448,12 +452,19 @@ class EncoderDecoder_clips(BaseSegmentor):
 
         loss_decode = self._decode_head_forward_train(x, img_metas,
                                                       gt_semantic_seg,batch_size, num_clips)
+        
+        # print("check2")
         losses.update(loss_decode)
+        # print("check3")
+        
 
         if self.with_auxiliary_head:
+            print("head")
             loss_aux = self._auxiliary_head_forward_train(
                 x, img_metas, gt_semantic_seg)
             losses.update(loss_aux)
+            
+        # print("check4")
 
         return losses
 
@@ -1360,10 +1371,10 @@ class EncoderDecoder_clips_flow_newPhotoMetricDistortion(BaseSegmentor):
                                                       gt_semantic_seg,batch_size, num_clips,img1)
         losses.update(loss_decode)
 
-        if self.with_auxiliary_head:
-            loss_aux = self._auxiliary_head_forward_train(
-                x, img_metas, gt_semantic_seg)
-            losses.update(loss_aux)
+        # if self.with_auxiliary_head:
+        #     loss_aux = self._auxiliary_head_forward_train(
+        #         x, img_metas, gt_semantic_seg)
+        #     losses.update(loss_aux)
 
         return losses
 
