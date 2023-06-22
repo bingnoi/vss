@@ -36,7 +36,9 @@ class FeatureMemory(nn.Module):
         query_frame_selected = feats.permute(0,2,3,1).reshape(B,-1,cx)
         query_frame_selected = self.linear1(query_frame_selected)
         
-        memory_feature = self.linear2(self.memory.data.permute(0,3,1,2)).reshape(B,-1,cx)
+        # print('stegsgbbbbbbbbb',self.memory.data.shape)
+        memory_f = self.memory.data.permute(0,2,3,1).reshape(B,-1,cx)
+        memory_feature = self.linear2(memory_f)
 
         # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
         

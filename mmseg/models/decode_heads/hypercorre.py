@@ -398,6 +398,10 @@ class hypercorre_topk2(nn.Module):
             if ii==0:
                 # print('query cx1 %d %d %d %d %d'%(B,num_ref_clips,cx,hy,wy))
                 # query=self.pooling_mhsa_k4(query,[1,2,3,4])
+                # print('sksksk',query.permute(0,1,3,4,2).shape)
+                # print('tttttt',self.dim[3])
+                # normal sksksk torch.Size([1, 3, 15, 27, 512])
+                
                 query_qkv=self.k4(query.permute(0,1,3,4,2)) #1 3 512 15 15
 
                 # query_key=self.k4(query.permute(0,1,3,4,2))

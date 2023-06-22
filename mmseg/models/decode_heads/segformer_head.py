@@ -239,6 +239,8 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
         start_time=time.time()
         if self.training:
             assert self.num_clips==num_clips
+        # if inputs[0].shape[0] == 1:
+        #     a=input()
         x = self._transform_inputs(inputs)  # len=4, 1/4,1/8,1/16,1/32
         c1, c2, c3, c4 = x
 
@@ -319,6 +321,8 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
         # supp_frame=[c1[-batch_size:].unsqueeze(1), c2[-batch_size:].unsqueeze(1), c3[-batch_size:].unsqueeze(1), c4[-batch_size:].unsqueeze(1)]
         # print('check1',[i.shape for i in query_frame])
         # print('check2',[i.shape for i in supp_frame])
+        # check1 [torch.Size([1, 3, 64, 120, 216]), torch.Size([1, 3, 128, 60, 108]), torch.Size([1, 3, 320, 30, 54]), torch.Size([1, 3, 512, 15, 27])]
+        # check2 [torch.Size([1, 1, 64, 120, 216]), torch.Size([1, 1, 128, 60, 108]), torch.Size([1, 1, 320, 30, 54]), torch.Size([1, 1, 512, 15, 27])]
         
 
         final_feature = self.hypercorre_module(query_frame,supp_frame)  

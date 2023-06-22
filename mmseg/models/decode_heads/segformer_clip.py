@@ -217,9 +217,9 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         self.linear1 = nn.Linear(dim[3],dim[3],bias=True)
         self.linear2 = nn.Linear(dim[3],dim[3],bias=True)
 
-        # self.deco1=small_decoder2(embedding_dim,256, self.num_classes)
-        # self.deco2=small_decoder2(embedding_dim,512, self.num_classes)
-        # self.deco3=small_decoder2(embedding_dim,512, self.num_classes)
+        self.deco1=small_decoder2(embedding_dim,256, self.num_classes)
+        self.deco2=small_decoder2(embedding_dim,512, self.num_classes)
+        self.deco3=small_decoder2(embedding_dim,512, self.num_classes)
         self.deco4=small_decoder2(embedding_dim,512, self.num_classes)
 
         # self.deco2=small_decoder2(embedding_dim,256, self.num_classes)
@@ -361,6 +361,7 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         B,num_clips_select,cx,hx,wx=query_c4.shape
         
         if self.training:
+            # print("wo mei xunlian")
             for i in range(num_clips_select):
                 query_frame_selected = query_c4[:,i].permute(0,2,3,1).reshape(B,-1,cx)
                 query_frame_selected = self.linear1(query_frame_selected) #b,-1,cx
@@ -510,19 +511,17 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # out3=resize(self.deco3(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         # out4=resize(self.deco4(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         
-        # out1=resize(self.deco1(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-        # out2=resize(self.deco2(outs[1]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-        # out3=resize(self.deco3(outs[2]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-        
-        
+        out1=resize(self.deco1(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        out2=resize(self.deco2(outs[1]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        out3=resize(self.deco3(outs[2]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         out4=resize(self.deco4(outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
 
         # out3=resize(self.deco3(outs[2]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         # out4=resize(self.deco4(outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         # out4=resize(self.deco4((outs[0]+outs[1]+outs[2])/3.0+outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
 
-        # output=torch.cat([x,out1,out2,out3,out4],dim=1)   ## b*(k+k)*124*h*w
-        output=torch.cat([x,out4],dim=1)
+        output=torch.cat([x,out1,out2,out3,out4],dim=1)   ## b*(k+k)*124*h*w
+        # output=torch.cat([x,out4],dim=1)
 
         # print("test ok")
         # a=input()
@@ -535,8 +534,8 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
             # return F.softmax(torch.cat([out1,out2,out3,out4],1),dim=2).sum(1)
             # return torch.cat([out1,out2,out3,out4],1).mean(1)
 
-        
-        return output[:,-1:]
+        return output
+        # return output[:,-1:]
 
    
 class small_decoder2(nn.Module):

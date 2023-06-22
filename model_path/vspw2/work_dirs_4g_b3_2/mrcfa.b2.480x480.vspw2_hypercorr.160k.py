@@ -2,7 +2,7 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 find_unused_parameters = True
 model = dict(
     type='EncoderDecoder_clips',
-    pretrained='/home/lixinhao/mit_b2.pth',
+    pretrained='/home/lixinhao/VSS-MRCFA/mit_b2.pth',
     backbone=dict(type='mit_b2', style='pytorch'),
     decode_head=dict(
         type='SegFormerHead_clips',

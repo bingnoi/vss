@@ -437,6 +437,8 @@ class EncoderDecoder_clips(BaseSegmentor):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
+        ##逻辑是前十个先做处理 后面的再做处理
+        
         if img.dim()==5:
             batch_size, num_clips, _, h, w =img.size()
 
@@ -445,19 +447,26 @@ class EncoderDecoder_clips(BaseSegmentor):
         # save_images(img[0,0],'img_0_0')
 
         img=img.reshape(batch_size*num_clips, -1, h,w)
+        
+        # print('iiii',img.shape)
 
         x = self.extract_feat(img)
+        
+        # print('ixxxx',x[0].shape)
+        # print('i2222',x[1].shape)
 
         losses = dict()
 
         loss_decode = self._decode_head_forward_train(x, img_metas,
                                                       gt_semantic_seg,batch_size, num_clips)
+        # {'loss': tensor(49.4864, device='cuda:0', grad_fn=<AddBackward0>), 
+        # 'log_vars': OrderedDict([('decode.loss_seg', 41.86023712158203), 
+        # ('decode.acc_seg', 0.37628173828125), ('loss', 41.86023712158203)]), 'num_samples': 1}
         
         # print("check2")
         losses.update(loss_decode)
         # print("check3")
         
-
         if self.with_auxiliary_head:
             print("head")
             loss_aux = self._auxiliary_head_forward_train(

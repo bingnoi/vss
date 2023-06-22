@@ -537,39 +537,56 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
 
                 assert chan==1
                 seg_label_ori=seg_label.reshape(batch_size*(num_clips),1,h,w)
-
                 # seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips,1,h,w).reshape(batch_size*(num_clips),1,h,w)
                 # seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips_last,1,h,w).reshape(batch_size*(num_clips_last),1,h,w)
 
                 # seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips_last,1,h,w).reshape(batch_size*(num_clips_last),1,h,w)
                 seg_label_last3frame = seg_label[:,:-1].reshape(batch_size*(num_clips_last-1),-1,h,w)
-
-
                 seg_label_lastframe = seg_label[:,-1:].reshape(batch_size,-1,h,w)
 
             elif seg_label.shape[1] > 4:
             # elif seg_label.shape[1] == num_selected_by:
                 frame_len = seg_label.shape[1]
-                frame_selected = []
+                frame_selected_last = []
+                frame_selected_last3 = []
+                frame_selected_all = []
                 for i in range(frame_len-frame_gap_l):
-                    frame_selected.append(list(range(i,i+frame_gap_l,frame_gap))[3])
-                
-                # print(len(frame_selected))
-                seg_label_selected = seg_label[:,frame_selected]
+                    frame_selected_last.append(list(range(i,i+frame_gap_l,frame_gap))[3])
+                for i in range(frame_len-frame_gap_l):
+                    frame_selected_last3.append(list(range(i,i+frame_gap_l,frame_gap))[:3])
+                for i in range(frame_len-frame_gap_l):
+                    frame_selected_all.append(list(range(i,i+frame_gap_l,frame_gap))) 
+                    
+                # print('sfrs',seg_label.shape)
+                    
+                seg_label_selected_all = seg_label[:,frame_selected_all]
+                seg_label_selected_last3 = seg_label[:,frame_selected_last3]
+                seg_label_selected_last = seg_label[:,frame_selected_last]
             
-                batch_size, num_clips, chan, h ,w=seg_label_selected.shape
+                # print('ttttttttt',seg_label_selected_all.shape)
+                batch_size,series,num_clips, chan, h ,w=seg_label_selected_all.shape
+                _,nlast3,_,_,_,_ = seg_label_selected_last3.shape
+                _,nlast,_,_,_ = seg_label_selected_last.shape
                 
-                seg_label_ori = seg_label_selected.reshape(batch_size*num_clips,1,h,w)
+                seg_label_ori = seg_label_selected_all.reshape(batch_size*series*num_clips,1,h,w)
+                seg_label_last3frame = seg_label_selected_last3.reshape(batch_size*nlast3*(num_clips-1),-1,h,w)
+                seg_label_lastframe = seg_label_selected_last.reshape(batch_size*nlast,-1,h,w)#每组最后那帧的预测
                 
-                # print(num_clips,seg_logit.shape[1])
+                # print('sssssssssss',seg_logit.shape)
+                batch_size, _,c, h ,w=seg_logit.shape
+                seg_logit = seg_logit.reshape(batch_size,-1,8,c,h,w)
+                assert series == seg_logit.shape[1]
                 
-                assert num_clips == seg_logit.shape[1]
+                # seg_logit_ori = []
+                # seg_logit_last3frame = []
+                # seg_logit_lastframe=[]
                 
-                num_clips=seg_label_selected.shape[1]
-                batch_size, _, _, h ,w=seg_logit.shape
-
-                # print('11111',seg_logit.shape)
-                seg_logit_ori=seg_logit.reshape(batch_size*(num_clips),-1,h,w)
+                seg_logit_ori=seg_logit[:,:,:num_clips].reshape(batch_size*series*num_clips,-1,h,w)
+                seg_logit_last3frame=seg_logit[:,:,num_clips:-1].reshape(batch_size*series*(num_clips-1),-1,h,w)
+                seg_logit_lastframe=seg_logit[:,:,-1:].reshape(batch_size*series,-1,h,w)
+                    
+                # seg_logit_ori=seg_logit.reshape(batch_size*(num_clips),-1,h,w)
+                # seg_logit_last3frame=seg_logit[:,]
 
             else:
                 assert False, "parameters not correct"            
@@ -643,6 +660,17 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                 size=seg_label.shape[3:],
                 mode='bilinear',
                 align_corners=self.align_corners)
+            seg_logit_last3frame = resize(
+                input=seg_logit_last3frame,
+                size=seg_label.shape[3:],
+                mode='bilinear',
+                align_corners=self.align_corners)
+
+            seg_logit_lastframe = resize(
+                input=seg_logit_lastframe,
+                size=seg_label.shape[3:],
+                mode='bilinear',
+                align_corners=self.align_corners)
 
             if self.sampler is not None:
                 seg_weight = self.sampler.sample(seg_logit, seg_label)
@@ -650,20 +678,45 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                 seg_weight = None
 
             seg_label_ori = seg_label_ori.squeeze(1)
+            seg_label_last3frame = seg_label_last3frame.squeeze(1)
+            seg_label_lastframe = seg_label_lastframe.squeeze(1)
             # seg_label_selected = 
 
             # print('lll',seg_logit_ori.shape, seg_logit_lastframe.shape)
             # print('mmmm',seg_label_ori.shape, seg_label_lastframe.shape)
             # print('q',seg_weight.shape)
             
-            # print('s',seg_logit_ori.shape,seg_label_selected.shape)
+            # print('ssss',seg_logit_ori.shape,seg_label_ori.shape)
             # torch.Size([5, 124, 480, 480]) torch.Size([1, 5, 1, 480, 480])
 
-            loss['loss_seg'] = self.loss_decode(
+            # loss['loss_seg'] = 0.5*self.loss_decode(
+            #     seg_logit_ori,
+            #     seg_label_ori,
+            #     weight=seg_weight,
+            #     ignore_index=self.ignore_index)+self.loss_decode(
+            #     seg_logit_last3frame,
+            #     seg_label_last3frame,
+            #     weight=seg_weight,
+            #     ignore_index=self.ignore_index)+0.5*self.loss_decode(
+            #     seg_logit_lastframe,
+            #     seg_label_lastframe,
+            #     weight=seg_weight,
+            #     ignore_index=self.ignore_index
+            #     )
+            loss['loss_seg'] = 0.5*self.loss_decode(
                 seg_logit_ori,
                 seg_label_ori,
                 weight=seg_weight,
-                ignore_index=self.ignore_index)
+                ignore_index=self.ignore_index)+self.loss_decode(
+                seg_logit_last3frame,
+                seg_label_last3frame,
+                weight=seg_weight,
+                ignore_index=self.ignore_index)+0.5*self.loss_decode(
+                seg_logit_lastframe,
+                seg_label_lastframe,
+                weight=seg_weight,
+                ignore_index=self.ignore_index
+                )
 
             loss['acc_seg'] = accuracy(seg_logit_ori, seg_label_ori)
 

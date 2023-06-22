@@ -46,7 +46,8 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         
         num_infer = self.num_infer[0]
         
-        print(inputs[0].shape)
+        # print(inputs[0].shape)
+        n,c,_,_ = inputs[0].shape
         # torch.Size([4, 64, 120, 216])
         
         frame_len = inputs[0].shape[0]
@@ -56,36 +57,31 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         
         out_to = []
         
-        print(frame_len,frame_gap_l)
+        # print(frame_len,frame_gap_l)
         # 4 7
         
         if self.training:
-            for i in range(frame_len-frame_gap_l):
+            for i in range(frame_len):
                 if i == 0:
                     memoryFeature = self.memory(mode='init_memory',feats=inputs[-1][:5,:])
-                if i%num_infer==0 and i>num_infer:
+                elif i%num_infer==0 and i>num_infer:
                     num_digit = i / 10
                     num_decimal = i % 10
                     carry = 1 if num_decimal>=5 else 0
-                    # print('qqqqq ',num_digit*10+carry*5)
-                    memoryFeature = self.memory(mode ='update_memory',feats=inputs[-1][num_digit*10+carry*5-5:num_digit*10+carry*5,:])
-                frame_in = []
-                for sh in range(4):
-                    frame_in.append(torch.stack([inputs[sh][q,:] for q in range(i,i+frame_gap_l,frame_gap)],dim=0))
-                out = self.net(mode='segment',feats=memoryFeature,inputs=frame_in,batch_size=1,num_clips=4)
+                    # print('qqqqq ',inputs[-1].shape,num_digit*10+carry*5-5,num_digit*10+carry*5)
+                    memoryFeature = self.memory(mode ='update_memory',feats=inputs[-1][int(num_digit*10+carry*5-5):int(num_digit*10+carry*5),:])
+                if i >= frame_gap_l:
+                    frame_in = []
+                    for sh in range(4):
+                        frame_in.append(torch.stack([inputs[sh][q,:] for q in range(i-frame_gap_l,i,frame_gap)],dim=0))
+                    out = self.net(mode='segment',feats=memoryFeature,inputs=frame_in,batch_size=1,num_clips=4)
+                    
+                    out_to.append(out)
                 
-                out_to.append(out)
-                
-                # print(out.shape)
-                # torch.Size([1, 8, 124, 120, 120])
         else:
             memoryFeature = []
-            out = self.net(mode='segment',feats=memoryFeature,inputs=inputs,batch_size=1,num_clips=4)
+            out = self.net(mode='segment',feats=memoryFeature,inputs=inputs,batch_size=1,num_clips=frame_len)
             out_to.append(out)
-            
-        print('s ',len(out_to))
-        # s 1
         
         out = torch.cat(out_to,dim=1)
-        # print('end ',frame_len-10)
         return out

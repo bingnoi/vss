@@ -24,7 +24,8 @@ def np2tmp(array, temp_file_name=None):
     Returns:
         str: The numpy file name.
     """
-
+    tempfile.tempdir= '/datadisk/tmpfile/'
+    
     if temp_file_name is None:
         temp_file_name = tempfile.NamedTemporaryFile(
             suffix='.npy', delete=False).name
@@ -129,6 +130,8 @@ def multi_gpu_test(model,
     Returns:
         list: The prediction results.
     """
+
+    # tmpdir = '/datadisk/tmpfile/'
 
     model.eval()
     results = []

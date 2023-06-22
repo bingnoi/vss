@@ -2185,7 +2185,7 @@ class CustomDataset_video2(Dataset):
         # print('ttt ',len(self.videolists))
         # print('see',len(imglist))
 
-        for i in list(range(len(imglist[0:11:1]))):
+        for i in list(range(len(imglist[0:10:1]))):
         # for i in this_step:
             img_name=imglist[i]
             img_info=dict(filename=img_name)
