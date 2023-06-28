@@ -279,6 +279,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                  channels,
                  *,
                  num_classes,
+                 num_infer=5,
                  dropout_ratio=0.1,
                  conv_cfg=None,
                  norm_cfg=None,
@@ -300,6 +301,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         super(BaseDecodeHead_clips, self).__init__()
         self._init_inputs(in_channels, in_index, input_transform)
         self.channels = channels
+        self.num_infer = num_infer
         self.num_classes = num_classes
         self.dropout_ratio = dropout_ratio
         self.conv_cfg = conv_cfg
@@ -410,7 +412,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         """Placeholder of forward function."""
         pass
 
-    def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg,batch_size, num_clips):
+    def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg,batch_size, num_clips,memory):
         """Forward function for training.
         Args:
             inputs (list[Tensor]): List of multi-level img features.
@@ -426,9 +428,9 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
-        seg_logits = self.forward(inputs,batch_size, num_clips)
+        seg_logits,memory = self.forward(inputs,batch_size, num_clips,memory)
         losses = self.losses(seg_logits, gt_semantic_seg)
-        return losses
+        return losses,memory
 
     def forward_test(self, inputs, img_metas, test_cfg, batch_size=None, num_clips=None):
         """Forward function for testing.
@@ -481,6 +483,9 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         """Compute segmentation loss."""
 
         # print(seg_logit.shape, seg_label.shape)
+        # torch.Size([1, 10, 124, 120, 120]) torch.Size([1, 20, 1, 480, 480])
+        
+        # num_selected_by = 15
 
         assert seg_logit.dim()==5 and seg_label.dim()==5
 
@@ -503,12 +508,18 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips,1,h,w).reshape(batch_size*(num_clips),1,h,w)
         elif self.hypercorre:
             # print("here2")
+            
+            # print(seg_label.shape[1],seg_logit.shape[1])
             # print(self.self_ensemble2,seg_logit.shape[1],seg_label.shape[1])
+            # torch.Size([10, 1, 5, 124, 120, 120]) torch.Size([1, 20, 1, 480, 480])
+            frame_gap = 2
+            frame_gap_l = frame_gap*3+1
+            
             # if self.self_ensemble2 and seg_logit.shape[1]==2*seg_label.shape[1]:
             if self.self_ensemble2 and seg_logit.shape[1]==seg_label.shape[1] + 4:
                 # print("here2")
-
                 # assert seg_logit.shape[1]==2*seg_label.shape[1]
+                
                 num_clips=seg_label.shape[1]
                 num_clips_last = 4
                 seg_logit_ori=seg_logit[:,:num_clips]
@@ -522,16 +533,56 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
 
                 assert chan==1
                 seg_label_ori=seg_label.reshape(batch_size*(num_clips),1,h,w)
-
                 # seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips,1,h,w).reshape(batch_size*(num_clips),1,h,w)
                 # seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips_last,1,h,w).reshape(batch_size*(num_clips_last),1,h,w)
 
                 # seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips_last,1,h,w).reshape(batch_size*(num_clips_last),1,h,w)
                 seg_label_last3frame = seg_label[:,:-1].reshape(batch_size*(num_clips_last-1),-1,h,w)
-
-
                 seg_label_lastframe = seg_label[:,-1:].reshape(batch_size,-1,h,w)
 
+            elif seg_label.shape[1] > 4:
+            # elif seg_label.shape[1] == num_selected_by:
+                frame_len = seg_label.shape[1]
+                frame_selected_last = []
+                frame_selected_last3 = []
+                frame_selected_all = []
+                for i in range(frame_len-frame_gap_l):
+                    frame_selected_last.append(list(range(i,i+frame_gap_l,frame_gap))[3])
+                for i in range(frame_len-frame_gap_l):
+                    frame_selected_last3.append(list(range(i,i+frame_gap_l,frame_gap))[:3])
+                for i in range(frame_len-frame_gap_l):
+                    frame_selected_all.append(list(range(i,i+frame_gap_l,frame_gap))) 
+                    
+                # print('sfrs',seg_label.shape)
+                    
+                seg_label_selected_all = seg_label[:,frame_selected_all]
+                seg_label_selected_last3 = seg_label[:,frame_selected_last3]
+                seg_label_selected_last = seg_label[:,frame_selected_last]
+            
+                # print('ttttttttt',seg_label_selected_all.shape)
+                batch_size,series,num_clips, chan, h ,w=seg_label_selected_all.shape
+                _,nlast3,_,_,_,_ = seg_label_selected_last3.shape
+                _,nlast,_,_,_ = seg_label_selected_last.shape
+                
+                seg_label_ori = seg_label_selected_all.reshape(batch_size*series*num_clips,1,h,w)
+                seg_label_last3frame = seg_label_selected_last3.reshape(batch_size*nlast3*(num_clips-1),-1,h,w)
+                seg_label_lastframe = seg_label_selected_last.reshape(batch_size*nlast,-1,h,w)#每组最后那帧的预测
+                
+                # print('sssssssssss',seg_logit.shape)
+                batch_size, _,c, h ,w=seg_logit.shape
+                seg_logit = seg_logit.reshape(batch_size,-1,8,c,h,w)
+                assert series == seg_logit.shape[1]
+                
+                # seg_logit_ori = []
+                # seg_logit_last3frame = []
+                # seg_logit_lastframe=[]
+                
+                seg_logit_ori=seg_logit[:,:,:num_clips].reshape(batch_size*series*num_clips,-1,h,w)
+                seg_logit_last3frame=seg_logit[:,:,num_clips:-1].reshape(batch_size*series*(num_clips-1),-1,h,w)
+                seg_logit_lastframe=seg_logit[:,:,-1:].reshape(batch_size*series,-1,h,w)
+                    
+                # seg_logit_ori=seg_logit.reshape(batch_size*(num_clips),-1,h,w)
+                # seg_logit_last3frame=seg_logit[:,]
 
             else:
                 assert False, "parameters not correct"            
@@ -541,59 +592,132 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         # print('m',seg_label_ori.shape, seg_label_lastframe.shape)
 
         # 一个是x,剩下那个是out1...4
-        seg_logit_ori = resize(
-            input=seg_logit_ori,
-            size=seg_label.shape[3:],
-            mode='bilinear',
-            align_corners=self.align_corners)
+        
+        if seg_label.shape[1] == 4:
+            # print(seg_logit_ori.shape,seg_label.shape[3:])
+            # torch.Size([4, 124, 120, 120]) torch.Size([480, 480])
+        
+            seg_logit_ori = resize(
+                input=seg_logit_ori,
+                size=seg_label.shape[3:],
+                mode='bilinear',
+                align_corners=self.align_corners)
 
-        seg_logit_last3frame = resize(
-            input=seg_logit_last3frame,
-            size=seg_label.shape[3:],
-            mode='bilinear',
-            align_corners=self.align_corners)
+            seg_logit_last3frame = resize(
+                input=seg_logit_last3frame,
+                size=seg_label.shape[3:],
+                mode='bilinear',
+                align_corners=self.align_corners)
 
-        seg_logit_lastframe = resize(
-            input=seg_logit_lastframe,
-            size=seg_label.shape[3:],
-            mode='bilinear',
-            align_corners=self.align_corners)
+            seg_logit_lastframe = resize(
+                input=seg_logit_lastframe,
+                size=seg_label.shape[3:],
+                mode='bilinear',
+                align_corners=self.align_corners)
 
-        if self.sampler is not None:
-            seg_weight = self.sampler.sample(seg_logit, seg_label)
+            if self.sampler is not None:
+                seg_weight = self.sampler.sample(seg_logit, seg_label)
+            else:
+                seg_weight = None
+
+            seg_label_ori = seg_label_ori.squeeze(1)
+            seg_label_last3frame = seg_label_last3frame.squeeze(1)
+            seg_label_lastframe = seg_label_lastframe.squeeze(1)
+
+            # print('lll',seg_logit_ori.shape, seg_logit_lastframe.shape)
+
+            # print('mmmm',seg_label_ori.shape, seg_label_lastframe.shape)
+
+            # print('q',seg_weight.shape)
+
+            loss['loss_seg'] = 0.5*self.loss_decode(
+                seg_logit_ori,
+                seg_label_ori,
+                weight=seg_weight,
+                ignore_index=self.ignore_index)+self.loss_decode(
+                seg_logit_last3frame,
+                seg_label_last3frame,
+                weight=seg_weight,
+                ignore_index=self.ignore_index)+0.5*self.loss_decode(
+                seg_logit_lastframe,
+                seg_label_lastframe,
+                weight=seg_weight,
+                ignore_index=self.ignore_index
+                )
+
+            loss['acc_seg'] = accuracy(seg_logit_ori, seg_label_ori)
+
         else:
-            seg_weight = None
+            # print(seg_logit_ori.shape,seg_label.shape[3:])
+            # torch.Size([1, 10, 124, 120, 120])  torch.Size([480, 480])
+            
+            seg_logit_ori = resize(
+                input=seg_logit_ori,
+                size=seg_label.shape[3:],
+                mode='bilinear',
+                align_corners=self.align_corners)
+            seg_logit_last3frame = resize(
+                input=seg_logit_last3frame,
+                size=seg_label.shape[3:],
+                mode='bilinear',
+                align_corners=self.align_corners)
 
-        seg_label_ori = seg_label_ori.squeeze(1)
-        seg_label_last3frame = seg_label_last3frame.squeeze(1)
-        seg_label_lastframe = seg_label_lastframe.squeeze(1)
+            seg_logit_lastframe = resize(
+                input=seg_logit_lastframe,
+                size=seg_label.shape[3:],
+                mode='bilinear',
+                align_corners=self.align_corners)
 
-        # print('lll',seg_logit_ori.shape, seg_logit_lastframe.shape)
+            if self.sampler is not None:
+                seg_weight = self.sampler.sample(seg_logit, seg_label)
+            else:
+                seg_weight = None
 
-        # print('mmmm',seg_label_ori.shape, seg_label_lastframe.shape)
+            seg_label_ori = seg_label_ori.squeeze(1)
+            seg_label_last3frame = seg_label_last3frame.squeeze(1)
+            seg_label_lastframe = seg_label_lastframe.squeeze(1)
+            # seg_label_selected = 
 
-        # print('q',seg_weight.shape)
+            # print('lll',seg_logit_ori.shape, seg_logit_lastframe.shape)
+            # print('mmmm',seg_label_ori.shape, seg_label_lastframe.shape)
+            # print('q',seg_weight.shape)
+            
+            # print('ssss',seg_logit_ori.shape,seg_label_ori.shape)
+            # torch.Size([5, 124, 480, 480]) torch.Size([1, 5, 1, 480, 480])
 
-        loss['loss_seg'] = 0.5*self.loss_decode(
-            seg_logit_ori,
-            seg_label_ori,
-            weight=seg_weight,
-            ignore_index=self.ignore_index)+self.loss_decode(
-            seg_logit_last3frame,
-            seg_label_last3frame,
-            weight=seg_weight,
-            ignore_index=self.ignore_index)+0.5*self.loss_decode(
-            seg_logit_lastframe,
-            seg_label_lastframe,
-            weight=seg_weight,
-            ignore_index=self.ignore_index
-            )
+            # loss['loss_seg'] = 0.5*self.loss_decode(
+            #     seg_logit_ori,
+            #     seg_label_ori,
+            #     weight=seg_weight,
+            #     ignore_index=self.ignore_index)+self.loss_decode(
+            #     seg_logit_last3frame,
+            #     seg_label_last3frame,
+            #     weight=seg_weight,
+            #     ignore_index=self.ignore_index)+0.5*self.loss_decode(
+            #     seg_logit_lastframe,
+            #     seg_label_lastframe,
+            #     weight=seg_weight,
+            #     ignore_index=self.ignore_index
+            #     )
+            loss['loss_seg'] = 0.5*self.loss_decode(
+                seg_logit_ori,
+                seg_label_ori,
+                weight=seg_weight,
+                ignore_index=self.ignore_index)+self.loss_decode(
+                seg_logit_last3frame,
+                seg_label_last3frame,
+                weight=seg_weight,
+                ignore_index=self.ignore_index)+0.5*self.loss_decode(
+                seg_logit_lastframe,
+                seg_label_lastframe,
+                weight=seg_weight,
+                ignore_index=self.ignore_index
+                )
 
-        loss['acc_seg'] = accuracy(seg_logit_ori, seg_label_ori)
+            loss['acc_seg'] = accuracy(seg_logit_ori, seg_label_ori)
 
-        # a=input()
-
-
+        # print('yes')
+        # print(loss['loss_seg'].shape,loss['acc_seg'].shape)
         return loss
 
 

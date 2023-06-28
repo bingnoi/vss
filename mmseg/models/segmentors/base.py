@@ -111,7 +111,7 @@ class BaseSegmentor(nn.Module):
             return self.aug_test(imgs, img_metas, **kwargs)
 
     @auto_fp16(apply_to=('img', ))
-    def forward(self, img, img_metas, return_loss=True, **kwargs):
+    def forward(self,memory, img, img_metas, return_loss=True, **kwargs):
         """Calls either :func:`forward_train` or :func:`forward_test` depending
         on whether ``return_loss`` is ``True``.
 
@@ -122,11 +122,11 @@ class BaseSegmentor(nn.Module):
         the outer list indicating test time augmentations.
         """
         if return_loss:
-            return self.forward_train(img, img_metas, **kwargs)
+            return self.forward_train(memory,img, img_metas, **kwargs)
         else:
             return self.forward_test(img, img_metas, **kwargs)
 
-    def train_step(self, data_batch, optimizer, **kwargs):
+    def train_step(self, data_batch, optimizer,memory, **kwargs):
         """The iteration step during training.
 
         This method defines an iteration step during training, except for the
@@ -156,7 +156,7 @@ class BaseSegmentor(nn.Module):
         # print(data_batch.keys())
         # print(data_batch['img'].shape, data_batch['gt_semantic_seg'].shape) # torch.Size([1, 3, 3, 480, 480]) torch.Size([1, 3, 1, 480, 480])
         # exit()
-        losses = self(**data_batch)
+        losses,memory = self(memory,**data_batch)
         loss, log_vars = self._parse_losses(losses)
         num_samples=len(data_batch['img'].data)
         # num_samples=data_batch['img'].shape[1]
@@ -168,7 +168,7 @@ class BaseSegmentor(nn.Module):
 
         # print(losses,outputs)
         # exit()
-        return outputs
+        return outputs,memory
 
     def val_step(self, data_batch, **kwargs):
         """The iteration step during validation.

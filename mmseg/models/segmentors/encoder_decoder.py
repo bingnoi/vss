@@ -377,16 +377,16 @@ class EncoderDecoder_clips(BaseSegmentor):
             align_corners=self.align_corners)
         return out
 
-    def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg,batch_size, num_clips):
+    def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg,batch_size, num_clips,memory):
         """Run forward function and calculate loss for decode head in
         training."""
         losses = dict()
-        loss_decode = self.decode_head.forward_train(x, img_metas,
+        loss_decode,memory = self.decode_head.forward_train(x, img_metas,
                                                      gt_semantic_seg,
-                                                     self.train_cfg,batch_size, num_clips)
+                                                     self.train_cfg,batch_size, num_clips,memory)
 
         losses.update(add_prefix(loss_decode, 'decode'))
-        return losses
+        return losses,memory
 
     def _decode_head_forward_test(self, x, img_metas, batch_size, num_clips):
         """Run forward function and calculate loss for decode head in
@@ -417,7 +417,7 @@ class EncoderDecoder_clips(BaseSegmentor):
 
         return seg_logit
 
-    def forward_train(self, img, img_metas, gt_semantic_seg):
+    def forward_train(self, memory,img, img_metas, gt_semantic_seg):
         """Forward function for training.
 
         Args:
@@ -446,8 +446,8 @@ class EncoderDecoder_clips(BaseSegmentor):
 
         losses = dict()
 
-        loss_decode = self._decode_head_forward_train(x, img_metas,
-                                                      gt_semantic_seg,batch_size, num_clips)
+        loss_decode,memory = self._decode_head_forward_train(x, img_metas,
+                                                      gt_semantic_seg,batch_size, num_clips,memory)
         losses.update(loss_decode)
 
         if self.with_auxiliary_head:
@@ -455,7 +455,7 @@ class EncoderDecoder_clips(BaseSegmentor):
                 x, img_metas, gt_semantic_seg)
             losses.update(loss_aux)
 
-        return losses
+        return losses,memory
 
     # TODO refactor
     def slide_inference(self, img, img_meta, rescale, batch_size, num_clips):
