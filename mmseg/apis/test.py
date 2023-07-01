@@ -24,6 +24,7 @@ def np2tmp(array, temp_file_name=None):
     Returns:
         str: The numpy file name.
     """
+    tempfile.tempdir= '/datadisk/tmpfile/'
 
     if temp_file_name is None:
         temp_file_name = tempfile.NamedTemporaryFile(
@@ -138,7 +139,8 @@ def multi_gpu_test(model,
         prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, rescale=True, **data)
+            memory = None
+            result = model(memory,return_loss=False, rescale=True, **data)
 
         if isinstance(result, list):
             if efficient_test:

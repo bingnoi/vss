@@ -361,7 +361,6 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         B,num_clips_select,cx,hx,wx=query_c4.shape
         
         if self.training:
-            # print("wo mei xunlian")
             for i in range(num_clips_select):
                 query_frame_selected = query_c4[:,i].permute(0,2,3,1).reshape(B,-1,cx)
                 query_frame_selected = self.linear1(query_frame_selected) #b,-1,cx
@@ -369,7 +368,7 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
                 # feats = feats.unsqueeze(0)
                 # B,feats_num_clips,cx,hx,wx=feats.shape 
                 B,cx,hx,wx=feats.shape 
-                memory_feature = self.linear2(feats.permute(0,2,3,1)).reshape(B,-1,cx)
+                memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,-1,cx))
 
                 # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
                 

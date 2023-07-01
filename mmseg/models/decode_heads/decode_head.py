@@ -447,7 +447,8 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         Returns:
             Tensor: Output segmentation map.
         """
-        return self.forward(inputs, batch_size, num_clips)
+        memory=None
+        return self.forward(inputs, batch_size, num_clips,memory)
 
     def cls_seg(self, feat):
         """Classify each pixel."""
@@ -699,7 +700,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             #     weight=seg_weight,
             #     ignore_index=self.ignore_index
             #     )
-            loss['loss_seg'] = 0.5*self.loss_decode(
+            loss['loss_seg'] = self.loss_decode(
                 seg_logit_ori,
                 seg_label_ori,
                 weight=seg_weight,

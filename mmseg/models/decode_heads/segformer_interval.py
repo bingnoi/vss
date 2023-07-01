@@ -93,4 +93,7 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         out = torch.cat(out_to,dim=1)
         # print('o',out.shape)
         # print('memory',memoryFeature.shape)
-        return out,memoryFeature
+        if self.training:
+            return out,memoryFeature
+        else:
+            return out

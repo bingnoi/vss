@@ -10,14 +10,15 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 find_unused_parameters = True
 model = dict(
     type='EncoderDecoder_clips',
-    pretrained='pretrained_model/mit_b2.pth',
+    pretrained='/home/lixinhao/original/mit_b2.pth',
     backbone=dict(
         type='mit_b2',
         style='pytorch'),
     decode_head=dict(
-        type='SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4',      ## SegFormerHead_clips2_resize_1_8_hypercorrelation3
+        # type='SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4',      ## SegFormerHead_clips2_resize_1_8_hypercorrelation3
         # type='MLPHead',
-        # num_infer = 5,
+        num_infer = 5,
+        type='SegFormerHead_clips',
         in_channels=[64, 128, 320, 512],
         in_index=[0, 1, 2, 3],
         feature_strides=[4, 8, 16, 32],
@@ -36,7 +37,7 @@ model = dict(
     test_cfg=dict(mode='whole'))
 
 # optimizer
-optimizer = dict(_delete_=True, type='AdamW', lr=0.00003, betas=(0.9, 0.999), weight_decay=0.01,
+optimizer = dict(_delete_=True, type='AdamW', lr=0.00002, betas=(0.9, 0.999), weight_decay=0.01,
                  paramwise_cfg=dict(custom_keys={'pos_block': dict(decay_mult=0.),
                                                  'norm': dict(decay_mult=0.),
                                                  'head': dict(lr_mult=10.)
