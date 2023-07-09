@@ -65,6 +65,32 @@ class CenterPivotConv4d_half(nn.Module):
 
 # [torch.Size([1, 1, 330, 512]), torch.Size([1, 1, 330, 320]), torch.Size([1, 1, 330, 128]), torch.Size([1, 1, 330, 64])]
 
+
+# class Memory(nn.Module):
+#     def __init__(self):
+#         super(Memory, self).__init__()
+#         self.memory_st = nn.Parameter(torch.zeros(1,4,330,512,dtype=torch.float), requires_grad=False)
+#         # self.memory_st = []
+#         # self.memory_st.append(nn.Parameter(torch.zeros(1,4,330,512,dtype=torch.float), requires_grad=False)) 
+#         # self.memory_st.append(nn.Parameter(torch.zeros(1,4,330,320,dtype=torch.float), requires_grad=False)) 
+#         # self.memory_st.append(nn.Parameter(torch.zeros(1,4,330,128,dtype=torch.float), requires_grad=False)) 
+#         # self.memory_st.append(nn.Parameter(torch.zeros(1,4,330,64,dtype=torch.float), requires_grad=False)) 
+
+#     def update(self,feature,ratio,step):
+#         _,_,_,emd = feature.shape
+#         self.memory_st[:,ratio:ratio+1,:,:emd] = ((step-1)/step) * self.memory_st[:,ratio:ratio+1,:,:emd] + (1/step) * feature
+#         # self.memory_st[ratio] = ((step-1)/step) * self.memory_st[ratio] + (1/step) * feature
+
+#     def get(self):
+#         return self.memory_st
+
+#     def forward(self, m_in,ratio,step):  
+#         # in b,1,-1,h,w
+#         # self.memory_st = self.update(m_in,)
+#         self.memory_st[ratio] = ((step-1)/step) * self.memory_st[ratio] + (1/step) * m_in
+
+#         return self.memory_st
+
 class HPNLearner_topk2(nn.Module): 
     def __init__(self, inch, backbone):
         super(HPNLearner_topk2, self).__init__()
@@ -240,35 +266,35 @@ class hypercorre_topk2(nn.Module):
         self.pooling_mhsa_fk2 = pooling_mhsa(dim[2])
         self.pooling_mhsa_fk1 = pooling_mhsa(dim[3])
 
-        # self.pooling_mhsa_fv4 = pooling_mhsa(dim[0])
-        # self.pooling_mhsa_fv3 = pooling_mhsa(dim[1])
-        # self.pooling_mhsa_fv2 = pooling_mhsa(dim[2])
-        # self.pooling_mhsa_fv1 = pooling_mhsa(dim[3])
+        self.pooling_mhsa_fv4 = pooling_mhsa(dim[0])
+        self.pooling_mhsa_fv3 = pooling_mhsa(dim[1])
+        self.pooling_mhsa_fv2 = pooling_mhsa(dim[2])
+        self.pooling_mhsa_fv1 = pooling_mhsa(dim[3])
 
         self.pooling_mhsa_sk4 = pooling_mhsa(dim[0])
         self.pooling_mhsa_sk3 = pooling_mhsa(dim[1])
         self.pooling_mhsa_sk2 = pooling_mhsa(dim[2])
         self.pooling_mhsa_sk1 = pooling_mhsa(dim[3])
 
-        # self.pooling_mhsa_sv4 = pooling_mhsa(dim[0])
-        # self.pooling_mhsa_sv3 = pooling_mhsa(dim[1])
-        # self.pooling_mhsa_sv2 = pooling_mhsa(dim[2])
-        # self.pooling_mhsa_sv1 = pooling_mhsa(dim[3])
+        self.pooling_mhsa_sv4 = pooling_mhsa(dim[0])
+        self.pooling_mhsa_sv3 = pooling_mhsa(dim[1])
+        self.pooling_mhsa_sv2 = pooling_mhsa(dim[2])
+        self.pooling_mhsa_sv1 = pooling_mhsa(dim[3])
 
         self.pooling_mhsa_f4 = pooling_mhsa(dim[0])
         self.pooling_mhsa_f3 = pooling_mhsa(dim[1])
         self.pooling_mhsa_f2 = pooling_mhsa(dim[2])
         self.pooling_mhsa_f1 = pooling_mhsa(dim[3])
 
-        # self.pooling_mhsa_fs4 = pooling_mhsa(dim[0])
-        # self.pooling_mhsa_fs3 = pooling_mhsa(dim[1])
-        # self.pooling_mhsa_fs2 = pooling_mhsa(dim[2])
-        # self.pooling_mhsa_fs1 = pooling_mhsa(dim[3])
+        self.pooling_mhsa_fs4 = pooling_mhsa(dim[0])
+        self.pooling_mhsa_fs3 = pooling_mhsa(dim[1])
+        self.pooling_mhsa_fs2 = pooling_mhsa(dim[2])
+        self.pooling_mhsa_fs1 = pooling_mhsa(dim[3])
 
-        # self.pooling_mhsa_fss4 = pooling_mhsa(dim[0])
-        # self.pooling_mhsa_fss3 = pooling_mhsa(dim[1])
-        # self.pooling_mhsa_fss2 = pooling_mhsa(dim[2])
-        # self.pooling_mhsa_fss1 = pooling_mhsa(dim[3])
+        self.pooling_mhsa_fss4 = pooling_mhsa(dim[0])
+        self.pooling_mhsa_fss3 = pooling_mhsa(dim[1])
+        self.pooling_mhsa_fss2 = pooling_mhsa(dim[2])
+        self.pooling_mhsa_fss1 = pooling_mhsa(dim[3])
 
         self.pooling_mhsa_fsq4 = pooling_mhsa(dim[0])
         self.pooling_mhsa_fsq3 = pooling_mhsa(dim[1])
@@ -285,15 +311,15 @@ class hypercorre_topk2(nn.Module):
         self.v2 = nn.Linear(dim[2], dim[2], bias=qkv_bias)
         self.v1 = nn.Linear(dim[3], dim[3], bias=qkv_bias)
 
-        # self.fs4 = nn.Linear(dim[0], dim[0], bias=qkv_bias)
-        # self.fs3 = nn.Linear(dim[1], dim[1], bias=qkv_bias)
-        # self.fs2 = nn.Linear(dim[2], dim[2], bias=qkv_bias)
-        # self.fs1 = nn.Linear(dim[3], dim[3], bias=qkv_bias)
+        self.fs4 = nn.Linear(dim[0], dim[0], bias=qkv_bias)
+        self.fs3 = nn.Linear(dim[1], dim[1], bias=qkv_bias)
+        self.fs2 = nn.Linear(dim[2], dim[2], bias=qkv_bias)
+        self.fs1 = nn.Linear(dim[3], dim[3], bias=qkv_bias)
 
-        # self.vs4 = nn.Linear(dim[0], dim[0], bias=qkv_bias)
-        # self.vs3 = nn.Linear(dim[1], dim[1], bias=qkv_bias)
-        # self.vs2 = nn.Linear(dim[2], dim[2], bias=qkv_bias)
-        # self.vs1 = nn.Linear(dim[3], dim[3], bias=qkv_bias)
+        self.vs4 = nn.Linear(dim[0], dim[0], bias=qkv_bias)
+        self.vs3 = nn.Linear(dim[1], dim[1], bias=qkv_bias)
+        self.vs2 = nn.Linear(dim[2], dim[2], bias=qkv_bias)
+        self.vs1 = nn.Linear(dim[3], dim[3], bias=qkv_bias)
 
         self.pk4 = nn.Linear(dim[0], dim[0], bias=qkv_bias)
         self.pk3 = nn.Linear(dim[1], dim[1], bias=qkv_bias)
@@ -305,15 +331,15 @@ class hypercorre_topk2(nn.Module):
         self.f2p = nn.Linear(dim[2], dim[2], bias=qkv_bias)
         self.f1p = nn.Linear(dim[3], dim[3], bias=qkv_bias)
 
-        # self.f4pv = nn.Linear(dim[0], dim[0], bias=qkv_bias)
-        # self.f3pv = nn.Linear(dim[1], dim[1], bias=qkv_bias)
-        # self.f2pv = nn.Linear(dim[2], dim[2], bias=qkv_bias)
-        # self.f1pv = nn.Linear(dim[3], dim[3], bias=qkv_bias)
+        self.f4pv = nn.Linear(dim[0], dim[0], bias=qkv_bias)
+        self.f3pv = nn.Linear(dim[1], dim[1], bias=qkv_bias)
+        self.f2pv = nn.Linear(dim[2], dim[2], bias=qkv_bias)
+        self.f1pv = nn.Linear(dim[3], dim[3], bias=qkv_bias)
 
-        # self.f4psv = nn.Linear(dim[0], dim[0], bias=qkv_bias)
-        # self.f3psv = nn.Linear(dim[1], dim[1], bias=qkv_bias)
-        # self.f2psv = nn.Linear(dim[2], dim[2], bias=qkv_bias)
-        # self.f1psv = nn.Linear(dim[3], dim[3], bias=qkv_bias)
+        self.f4psv = nn.Linear(dim[0], dim[0], bias=qkv_bias)
+        self.f3psv = nn.Linear(dim[1], dim[1], bias=qkv_bias)
+        self.f2psv = nn.Linear(dim[2], dim[2], bias=qkv_bias)
+        self.f1psv = nn.Linear(dim[3], dim[3], bias=qkv_bias)
         
         self.pooling_proj_linear = nn.Linear(1024,256)
         self.pooling_proj_linear_1 = nn.Linear(1024,256)
@@ -328,6 +354,8 @@ class hypercorre_topk2(nn.Module):
 
         self.linear1 = nn.Linear(dim[3], dim[3], bias=qkv_bias)
         self.linear2 = nn.Linear(512, 512, bias=qkv_bias)
+
+        self.memory = nn.Parameter(torch.zeros([1,3,512,15,15]), requires_grad = False)
 
         self.k_top=5
         if backbone=='b0':
@@ -372,10 +400,6 @@ class hypercorre_topk2(nn.Module):
             if ii==0:
                 # print('query cx1 %d %d %d %d %d'%(B,num_ref_clips,cx,hy,wy))
                 # query=self.pooling_mhsa_k4(query,[1,2,3,4])
-                # print('sksksk',query.permute(0,1,3,4,2).shape)
-                # print('tttttt',self.dim[3])
-                # normal sksksk torch.Size([1, 3, 15, 27, 512])
-                
                 query_qkv=self.k4(query.permute(0,1,3,4,2)) #1 3 512 15 15
 
                 # query_key=self.k4(query.permute(0,1,3,4,2))
@@ -516,8 +540,6 @@ class hypercorre_topk2(nn.Module):
         p1_features.append(self.pooling_mhsa_fsq2(query_frame[1][:,2:3],[2,4,6,8]))
         p1_features.append(self.pooling_mhsa_fsq3(query_frame[2][:,2:3],[4,8,12,16]))
         p1_features.append(self.pooling_mhsa_fsq4(query_frame[3][:,2:3],[8,16,24,32]))
-        
-        # 有一个怀疑的点  last3_features_cat压根没用上
 
         last3_features_cat = torch.cat(p1_features,dim=3)
 

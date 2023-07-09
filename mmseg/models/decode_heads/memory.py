@@ -62,3 +62,5 @@ class FeatureMemory(nn.Module):
             return self.init_memory(feats)
         elif mode == 'update_memory':
             return self.update_memory(feats)
+        elif mode == 'set_memory':
+            return self.set_memory(feats)

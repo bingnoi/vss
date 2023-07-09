@@ -448,6 +448,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             Tensor: Output segmentation map.
         """
         memory=None
+        # print('clip',num_clips)
         return self.forward(inputs, batch_size, num_clips,memory)
 
     def cls_seg(self, feat):
@@ -547,12 +548,12 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                 frame_selected_last = []
                 frame_selected_last3 = []
                 frame_selected_all = []
-                for i in range(frame_len-frame_gap_l):
-                    frame_selected_last.append(list(range(i,i+frame_gap_l,frame_gap))[3])
-                for i in range(frame_len-frame_gap_l):
-                    frame_selected_last3.append(list(range(i,i+frame_gap_l,frame_gap))[:3])
-                for i in range(frame_len-frame_gap_l):
-                    frame_selected_all.append(list(range(i,i+frame_gap_l,frame_gap))) 
+                for i in range(frame_gap_l-1,frame_len):
+                    frame_selected_last.append(list(range(i-frame_gap_l+1,i+1,frame_gap))[3])
+                for i in range(frame_gap_l-1,frame_len):
+                    frame_selected_last3.append(list(range(i-frame_gap_l+1,i+1,frame_gap))[:3])
+                for i in range(frame_gap_l-1,frame_len):
+                    frame_selected_all.append(list(range(i-frame_gap_l+1,i+1,frame_gap))) 
                     
                 # print('sfrs',seg_label.shape)
                     
@@ -572,6 +573,11 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                 # print('sssssssssss',seg_logit.shape)
                 batch_size, _,c, h ,w=seg_logit.shape
                 seg_logit = seg_logit.reshape(batch_size,-1,8,c,h,w)
+                # print('tt',series,seg_logit.shape[1])
+                # print(frame_selected_last)
+                # print(frame_selected_last3)
+                # print(frame_selected_all)
+                # exit()
                 assert series == seg_logit.shape[1]
                 
                 # seg_logit_ori = []
@@ -700,15 +706,18 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             #     weight=seg_weight,
             #     ignore_index=self.ignore_index
             #     )
-            loss['loss_seg'] = self.loss_decode(
+            
+            a = 0.4
+            b = 0.4
+            loss['loss_seg'] = a*self.loss_decode(
                 seg_logit_ori,
                 seg_label_ori,
                 weight=seg_weight,
-                ignore_index=self.ignore_index)+self.loss_decode(
+                ignore_index=self.ignore_index)+b*self.loss_decode(
                 seg_logit_last3frame,
                 seg_label_last3frame,
                 weight=seg_weight,
-                ignore_index=self.ignore_index)+0.5*self.loss_decode(
+                ignore_index=self.ignore_index)+(1-a-b)*self.loss_decode(
                 seg_logit_lastframe,
                 seg_label_lastframe,
                 weight=seg_weight,

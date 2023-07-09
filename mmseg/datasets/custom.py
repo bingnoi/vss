@@ -2274,13 +2274,15 @@ class CustomDataset_video2(Dataset):
         video, img_name=video_imgname[0], video_imgname[1]
         imglist = self.imgdic[video]
         img_index=imglist.index(img_name)
+        
         this_step=[]
+        this_steps=[]
         for dil in self.dilation:
             clip_index=img_index+dil
             if clip_index>=0 and clip_index<len(imglist):
                 this_step.append(clip_index)
         this_step.append(img_index)
-
+        
         if self.dilation==[-9,-6,-3]:
             if img_index==3:
                 this_step=[0,1,2,3]
@@ -2294,6 +2296,9 @@ class CustomDataset_video2(Dataset):
                 this_step=[0,3,5,7]
             elif img_index==8:
                 this_step=[0,3,6,8]
+                
+        # print(idx,video_imgname,video,img_name,len(imglist),img_index,this_step)
+        
 
         clips_img = []
         clips_target=[]
@@ -2304,38 +2309,101 @@ class CustomDataset_video2(Dataset):
         ori_filename_clips, img_clips, img_shape_clips, ori_shape_clips, pad_shape_clips=[],[],[],[],[]
         scale_factor_clips, img_norm_cfg_clips, gt_semantic_seg_clips=[],[],[]
 
-        for i in this_step:
-            img_name=imglist[i]
-            img_info=dict(filename=img_name)
-            seg_map = img_name.replace(self.img_suffix, self.seg_map_suffix)
-            img_info['ann'] = dict(seg_map=seg_map)
-            ann_info=dict(seg_map=seg_map)
-            img_dir=os.path.join(self.data_root,'data',video,'origin/')
-            ann_dir=os.path.join(self.data_root,'data',video,'mask/')
-            results = dict(img_info=img_info, ann_info=ann_info)
-            self.pre_pipeline(results, img_dir, ann_dir)
-            # clips_img.append(results['img'])
-            # clips_target.append(results['gt_semantic_seg'])
-            # clips_meta.append(results['img_metas'])
-            self.pipeline_load(results)
-            results_all.append(results)
-            img_info_clips.append(results['img_info'])
-            ann_info_clips.append(results['ann_info'])
-            seg_fields_clips.append(results["seg_fields"])
-            img_prefix_clips.append(results["img_prefix"])
-            seg_prefix_clips.append(results["seg_prefix"])
-            filename_clips.append(results["filename"])
-            ori_filename_clips.append(results["ori_filename"])
-            img_clips.append(results["img"]) 
-            img_shape_clips.append(results["img_shape"])
-            ori_shape_clips.append(results["ori_shape"])
-            pad_shape_clips.append(results["pad_shape"])
-            scale_factor_clips.append(results["scale_factor"])
-            img_norm_cfg_clips.append(results["img_norm_cfg"])
-            # gt_semantic_seg_clips.append(results["gt_semantic_seg"])
-            # for key, value in results.item():
-            # print(results["seg_fields"])
-            # exit()
+        # for i in list(range(len(imglist[:15:1]))):
+        
+        # for i in this_step:
+        #     img_name=imglist[i]
+        #     img_info=dict(filename=img_name)
+        #     seg_map = img_name.replace(self.img_suffix, self.seg_map_suffix)
+        #     img_info['ann'] = dict(seg_map=seg_map)
+        #     ann_info=dict(seg_map=seg_map)
+        #     img_dir=os.path.join(self.data_root,'data',video,'origin/')
+        #     ann_dir=os.path.join(self.data_root,'data',video,'mask/')
+        #     results = dict(img_info=img_info, ann_info=ann_info)
+        #     self.pre_pipeline(results, img_dir, ann_dir)
+        #     # clips_img.append(results['img'])
+        #     # clips_target.append(results['gt_semantic_seg'])
+        #     # clips_meta.append(results['img_metas'])
+        #     self.pipeline_load(results)
+        #     results_all.append(results)
+        #     img_info_clips.append(results['img_info'])
+        #     ann_info_clips.append(results['ann_info'])
+        #     seg_fields_clips.append(results["seg_fields"])
+        #     img_prefix_clips.append(results["img_prefix"])
+        #     seg_prefix_clips.append(results["seg_prefix"])
+        #     filename_clips.append(results["filename"])
+        #     ori_filename_clips.append(results["ori_filename"])
+        #     img_clips.append(results["img"]) 
+        #     img_shape_clips.append(results["img_shape"])
+        #     ori_shape_clips.append(results["ori_shape"])
+        #     pad_shape_clips.append(results["pad_shape"])
+        #     scale_factor_clips.append(results["scale_factor"])
+        #     img_norm_cfg_clips.append(results["img_norm_cfg"])
+        
+        if this_step[-1]<6:
+            for i in this_step:
+                img_name=imglist[i]
+                img_info=dict(filename=img_name)
+                seg_map = img_name.replace(self.img_suffix, self.seg_map_suffix)
+                img_info['ann'] = dict(seg_map=seg_map)
+                ann_info=dict(seg_map=seg_map)
+                img_dir=os.path.join(self.data_root,'data',video,'origin/')
+                ann_dir=os.path.join(self.data_root,'data',video,'mask/')
+                results = dict(img_info=img_info, ann_info=ann_info)
+                self.pre_pipeline(results, img_dir, ann_dir)
+                # clips_img.append(results['img'])
+                # clips_target.append(results['gt_semantic_seg'])
+                # clips_meta.append(results['img_metas'])
+                self.pipeline_load(results)
+                results_all.append(results)
+                img_info_clips.append(results['img_info'])
+                ann_info_clips.append(results['ann_info'])
+                seg_fields_clips.append(results["seg_fields"])
+                img_prefix_clips.append(results["img_prefix"])
+                seg_prefix_clips.append(results["seg_prefix"])
+                filename_clips.append(results["filename"])
+                ori_filename_clips.append(results["ori_filename"])
+                img_clips.append(results["img"]) 
+                img_shape_clips.append(results["img_shape"])
+                ori_shape_clips.append(results["ori_shape"])
+                pad_shape_clips.append(results["pad_shape"])
+                scale_factor_clips.append(results["scale_factor"])
+                img_norm_cfg_clips.append(results["img_norm_cfg"])
+        else:
+            # print(max(0,this_step[-1]-15),this_step[-1])
+            for i in range(max(0,this_step[-1]-15),this_step[-1]):
+                # print('i am in',idx,this_step,i)
+                img_name=imglist[i]
+                img_info=dict(filename=img_name)
+                seg_map = img_name.replace(self.img_suffix, self.seg_map_suffix)
+                img_info['ann'] = dict(seg_map=seg_map)
+                ann_info=dict(seg_map=seg_map)
+                img_dir=os.path.join(self.data_root,'data',video,'origin/')
+                ann_dir=os.path.join(self.data_root,'data',video,'mask/')
+                results = dict(img_info=img_info, ann_info=ann_info)
+                self.pre_pipeline(results, img_dir, ann_dir)
+                # clips_img.append(results['img'])
+                # clips_target.append(results['gt_semantic_seg'])
+                # clips_meta.append(results['img_metas'])
+                self.pipeline_load(results)
+                results_all.append(results)
+                img_info_clips.append(results['img_info'])
+                ann_info_clips.append(results['ann_info'])
+                seg_fields_clips.append(results["seg_fields"])
+                img_prefix_clips.append(results["img_prefix"])
+                seg_prefix_clips.append(results["seg_prefix"])
+                filename_clips.append(results["filename"])
+                ori_filename_clips.append(results["ori_filename"])
+                img_clips.append(results["img"]) 
+                img_shape_clips.append(results["img_shape"])
+                ori_shape_clips.append(results["ori_shape"])
+                pad_shape_clips.append(results["pad_shape"])
+                scale_factor_clips.append(results["scale_factor"])
+                img_norm_cfg_clips.append(results["img_norm_cfg"])
+                # gt_semantic_seg_clips.append(results["gt_semantic_seg"])
+                # for key, value in results.item():
+                # print(results["seg_fields"])
+                # exit()
 
         results_new=dict(img_info=img_info_clips[-1],ann_info=ann_info_clips[-1],seg_fields=seg_fields_clips[-1],
             img_prefix=img_prefix_clips[-1],seg_prefix=seg_prefix_clips[-1],

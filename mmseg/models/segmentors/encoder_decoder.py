@@ -574,8 +574,12 @@ class EncoderDecoder_clips(BaseSegmentor):
 
         img=img.reshape(batch_size*num_clips, -1, h,w)
         # exit()
+        # print('iii',img.shape)
         seg_logit = self.inference(img, img_meta, rescale, batch_size, num_clips)
+        # print('sss',seg_logit.shape)
         seg_pred = seg_logit.argmax(dim=1)
+        # print('ppp',seg_pred.shape)
+        # exit()
         if torch.onnx.is_in_onnx_export():
             # our inference backend only support 4D output
             seg_pred = seg_pred.unsqueeze(0)

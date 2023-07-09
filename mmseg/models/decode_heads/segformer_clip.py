@@ -295,8 +295,12 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         start_time=time.time()
         if self.training:
             assert self.num_clips==num_clips
+        
+        # print('shape2',[i.shape for i in inputs])
         x = self._transform_inputs(inputs)  # len=4, 1/4,1/8,1/16,1/32
         c1, c2, c3, c4 = x
+        
+        # print('c40 ',c4.shape)
 
         ############## MLP decoder on C1-C4 ###########
         # print(c4.shape)
@@ -341,6 +345,7 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         c2=c2.reshape(batch_size, num_clips, -1, c2.shape[-2], c2.shape[-1])
         c3=c3.reshape(batch_size, num_clips, -1, c3.shape[-2], c3.shape[-1])
         c4=c4.reshape(batch_size, num_clips, -1, c4.shape[-2], c4.shape[-1])
+        # print('c41 ',c4.shape)
         query_c1, query_c2, query_c3, query_c4=c1[:,:-1], c2[:,:-1], c3[:,:-1], c4[:,:-1]
         # remove last frame
         
@@ -359,14 +364,17 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # query_c4=query_c4.reshape(batch_size, (num_clips-1), -1, query_c4.shape[-2], query_c4.shape[-1])
         
         B,num_clips_select,cx,hx,wx=query_c4.shape
+        # print('c42 ',query_c4.shape)
         
-        if self.training:
+        # if self.training:
+        if len(feats)>0:
             for i in range(num_clips_select):
                 query_frame_selected = query_c4[:,i].permute(0,2,3,1).reshape(B,-1,cx)
+                # print('ss ',query_c4[:,i].shape)
                 query_frame_selected = self.linear1(query_frame_selected) #b,-1,cx
                 
-                # feats = feats.unsqueeze(0)
                 # B,feats_num_clips,cx,hx,wx=feats.shape 
+                # print('f ',feats.shape)
                 B,cx,hx,wx=feats.shape 
                 memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,-1,cx))
 
@@ -529,6 +537,7 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         if not self.training:
             # return output.squeeze(1)
             # return torch.cat([x2,x3],1).mean(1)
+            # print('shape ',out4.squeeze(1).shape)
             return out4.squeeze(1)
             # return out4.squeeze(1)+(out3.squeeze(1)+out2.squeeze(1)+out1.squeeze(1))/3
             # return F.softmax(torch.cat([out1,out2,out3,out4],1),dim=2).sum(1)
