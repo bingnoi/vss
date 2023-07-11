@@ -10,35 +10,49 @@ class FeatureMemory(nn.Module):
         super(FeatureMemory,self).__init__()
         # self.memory = nn.Parameter(torch.zeros([1,5,512,15,15]), requires_grad = False)
         self.memory = nn.Parameter(torch.zeros([1,512,15,15]), requires_grad = False)
-        self.linearfuse1 = nn.Linear(5*512,512)
         
         self.linear1 = nn.Linear(512,512)
         self.linear2 = nn.Linear(512,512)
+        self.linear3 = nn.Linear(512,512)
+        
+        self.initlinear = nn.Linear(512,512)
+        self.initlinear2 = nn.Linear(4*512,4*512)
+        self.initlinear3 = nn.Linear(4*512,4*512)
         
     def set_memory(self,feats):
         self.memory.data=feats
         return self.memory.data
-
+    
+    def handle_squeeze(self,feats):
+        b,n,cx,hx,wx = feats.shape
+        f_first = feats[:,:1]
+        f_later = feats[:,1:]
+        
+        f_first = f_first.permute(0,2,3,1).reshape(b,-1,cx)
+        f_later = f_later.permute(0,2,3,1).reshape(b,-1,cx)
+        
+        f_first_q = self.initlinear(f_first)
+        f_later_k = self.initlinear2(f_later)
+        f_later_v = self.initlinear3(f_later)
+        
+        feats_atten = torch.matmul(f_first_q,f_later_k.transpose(-1,-2))
+        feats = torch.matmul(feats_atten,f_later_v)
+        
+        return feats
+        
     def init_memory(self,feats):
         #print(feats.shape)
-        b,n,c,hx,wx = feats.shape
-        feats = feats.reshape(b,-1,hx,wx).permute(0,2,3,1)
-        feats = self.linearfuse1(feats)
-        feats = feats.permute(0,3,1,2) 
+        feats = self.handle_squeeze(feats)
         
         self.memory.data = feats
         return self.memory.data
 
     def update_memory(self,feats):
-        B,num_clips,cx,hx,wx=feats.shape
+        B,n,cx,hx,wx = feats.shape
+        feats = self.handle_squeeze(feats)
+        feats_k = self.linear1(feats)
         
-        b,n,c,hx,wx = feats.shape
-        feats = feats.reshape(b,-1,hx,wx).permute(0,2,3,1)
-        feats = self.linearfuse1(feats)
-        feats = feats.permute(0,3,1,2)#b,c,hw,wx
-        
-        query_frame_selected = feats.permute(0,2,3,1).reshape(B,-1,cx)
-        query_frame_selected = self.linear1(query_frame_selected)
+        feats_v = self.linear2(feats)
         
         # print('stegsgbbbbbbbbb',self.memory.data.shape)
         memory_f = self.memory.data.permute(0,2,3,1).reshape(B,-1,cx)
@@ -46,10 +60,10 @@ class FeatureMemory(nn.Module):
 
         # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
         
-        atten = torch.matmul(query_frame_selected,memory_feature.transpose(-1,-2))
+        atten = torch.matmul(memory_feature,feats_k.transpose(-1,-2))
 
         #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-        out = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
+        out = torch.matmul(atten,feats_v).reshape(B,hx,wx,cx).permute(0,3,1,2)
         self.memory.data = out
         return self.memory.data
 

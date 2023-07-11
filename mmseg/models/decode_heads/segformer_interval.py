@@ -93,6 +93,8 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         
         # out = None
         
+        
+        # 第一是可能出现overlap,第二是可能出现0-5帧的重复更新特征
         if frame_len < frame_gap_l:
             memoryFeature = []
             out = self.net(mode='segment',feats=memoryFeature,inputs=inputs,batch_size=1,num_clips=frame_len)

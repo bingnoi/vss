@@ -347,7 +347,10 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         c4=c4.reshape(batch_size, num_clips, -1, c4.shape[-2], c4.shape[-1])
         # print('c41 ',c4.shape)
         query_c1, query_c2, query_c3, query_c4=c1[:,:-1], c2[:,:-1], c3[:,:-1], c4[:,:-1]
-        # remove last frame
+        query_frame=[query_c1, query_c2, query_c3, query_c4]
+        
+        supp_frame=[c1[:,-1:], c2[:,-1:], c3[:,-1:], c4[:,-1:]]
+        supp_c1,supp_c2,supp_c3,supp_c4 = supp_frame[0],supp_frame[1],supp_frame[2],supp_frame[3] 
         
         # query_c2=query_c2.reshape(batch_size*(num_clips-1), -1, shape_c2[0], shape_c2[1])
         # query_c3=query_c3.reshape(batch_size*(num_clips-1), -1, shape_c3[0], shape_c3[1])
@@ -363,31 +366,29 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         
         # query_c4=query_c4.reshape(batch_size, (num_clips-1), -1, query_c4.shape[-2], query_c4.shape[-1])
         
-        B,num_clips_select,cx,hx,wx=query_c4.shape
+        B,num_clips_select,cx,hx,wx=supp_c4.shape
         # print('c42 ',query_c4.shape)
         
         # if self.training:
         if len(feats)>0:
-            for i in range(num_clips_select):
-                query_frame_selected = query_c4[:,i].permute(0,2,3,1).reshape(B,-1,cx)
-                # print('ss ',query_c4[:,i].shape)
-                query_frame_selected = self.linear1(query_frame_selected) #b,-1,cx
-                
-                # B,feats_num_clips,cx,hx,wx=feats.shape 
-                # print('f ',feats.shape)
-                B,cx,hx,wx=feats.shape 
-                memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,-1,cx))
-
-                # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
-                
-                atten = torch.matmul(query_frame_selected,memory_feature.transpose(-1,-2))
-
-                #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-                query_c4[:,i] = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
+            supp_frame_selected = supp_c4.permute(0,2,3,1).reshape(B,-1,cx)
+            # print('ss ',query_c4[:,i].shape)
+            supp_frame_selected = self.linear1(supp_frame_selected) #b,-1,cx
             
+            # B,feats_num_clips,cx,hx,wx=feats.shape 
+            # print('f ',feats.shape)
+            B,cx,hx,wx=feats.shape 
+            memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,-1,cx))
 
-        query_frame=[query_c1, query_c2, query_c3, query_c4]
-        supp_frame=[c1[:,-1:], c2[:,-1:], c3[:,-1:], c4[:,-1:]]
+            # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
+            
+            atten = torch.matmul(memory_feature,supp_frame_selected.transpose(-1,-2))
+
+            #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
+            supp_c4 = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
+        
+        
+        supp_frame = [supp_c1, supp_c2, supp_c3, supp_c4]
         # supp_frame=[c1[-batch_size:].unsqueeze(1), c2[-batch_size:].unsqueeze(1), c3[-batch_size:].unsqueeze(1), c4[-batch_size:].unsqueeze(1)]
         # print('check1',[i.shape for i in query_frame])
         # print('check2',[i.shape for i in supp_frame])
