@@ -380,10 +380,10 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
 
                 # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
                 
-                atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
+                atten = torch.matmul(query_frame_selected,memory_feature.transpose(-1,-2))
 
                 #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-                query_c4[:,i] = torch.matmul(atten,query_frame_selected).reshape(B,hx,wx,cx).permute(0,3,1,2)
+                query_c4[:,i] = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
             
 
         query_frame=[query_c1, query_c2, query_c3, query_c4]

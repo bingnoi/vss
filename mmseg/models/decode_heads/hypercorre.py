@@ -266,40 +266,41 @@ class hypercorre_topk2(nn.Module):
         self.pooling_mhsa_fk2 = pooling_mhsa(dim[2])
         self.pooling_mhsa_fk1 = pooling_mhsa(dim[3])
 
-        self.pooling_mhsa_fv4 = pooling_mhsa(dim[0])
-        self.pooling_mhsa_fv3 = pooling_mhsa(dim[1])
-        self.pooling_mhsa_fv2 = pooling_mhsa(dim[2])
-        self.pooling_mhsa_fv1 = pooling_mhsa(dim[3])
+        # self.pooling_mhsa_fv4 = pooling_mhsa(dim[0])
+        # self.pooling_mhsa_fv3 = pooling_mhsa(dim[1])
+        # self.pooling_mhsa_fv2 = pooling_mhsa(dim[2])
+        # self.pooling_mhsa_fv1 = pooling_mhsa(dim[3])
 
         self.pooling_mhsa_sk4 = pooling_mhsa(dim[0])
         self.pooling_mhsa_sk3 = pooling_mhsa(dim[1])
         self.pooling_mhsa_sk2 = pooling_mhsa(dim[2])
         self.pooling_mhsa_sk1 = pooling_mhsa(dim[3])
 
-        self.pooling_mhsa_sv4 = pooling_mhsa(dim[0])
-        self.pooling_mhsa_sv3 = pooling_mhsa(dim[1])
-        self.pooling_mhsa_sv2 = pooling_mhsa(dim[2])
-        self.pooling_mhsa_sv1 = pooling_mhsa(dim[3])
+        # self.pooling_mhsa_sv4 = pooling_mhsa(dim[0])
+        # self.pooling_mhsa_sv3 = pooling_mhsa(dim[1])
+        # self.pooling_mhsa_sv2 = pooling_mhsa(dim[2])
+        # self.pooling_mhsa_sv1 = pooling_mhsa(dim[3])
 
         self.pooling_mhsa_f4 = pooling_mhsa(dim[0])
         self.pooling_mhsa_f3 = pooling_mhsa(dim[1])
         self.pooling_mhsa_f2 = pooling_mhsa(dim[2])
         self.pooling_mhsa_f1 = pooling_mhsa(dim[3])
 
-        self.pooling_mhsa_fs4 = pooling_mhsa(dim[0])
-        self.pooling_mhsa_fs3 = pooling_mhsa(dim[1])
-        self.pooling_mhsa_fs2 = pooling_mhsa(dim[2])
-        self.pooling_mhsa_fs1 = pooling_mhsa(dim[3])
+        # self.pooling_mhsa_fs4 = pooling_mhsa(dim[0])
+        # self.pooling_mhsa_fs3 = pooling_mhsa(dim[1])
+        # self.pooling_mhsa_fs2 = pooling_mhsa(dim[2])
+        # self.pooling_mhsa_fs1 = pooling_mhsa(dim[3])
 
-        self.pooling_mhsa_fss4 = pooling_mhsa(dim[0])
-        self.pooling_mhsa_fss3 = pooling_mhsa(dim[1])
-        self.pooling_mhsa_fss2 = pooling_mhsa(dim[2])
-        self.pooling_mhsa_fss1 = pooling_mhsa(dim[3])
+        # self.pooling_mhsa_fss4 = pooling_mhsa(dim[0])
+        # self.pooling_mhsa_fss3 = pooling_mhsa(dim[1])
+        # self.pooling_mhsa_fss2 = pooling_mhsa(dim[2])
+        # self.pooling_mhsa_fss1 = pooling_mhsa(dim[3])
 
-        self.pooling_mhsa_fsq4 = pooling_mhsa(dim[0])
-        self.pooling_mhsa_fsq3 = pooling_mhsa(dim[1])
-        self.pooling_mhsa_fsq2 = pooling_mhsa(dim[2])
-        self.pooling_mhsa_fsq1 = pooling_mhsa(dim[3])
+        # self.pooling_mhsa_fsq4 = pooling_mhsa(dim[0])
+        # self.pooling_mhsa_fsq3 = pooling_mhsa(dim[1])
+        # self.pooling_mhsa_fsq2 = pooling_mhsa(dim[2])
+        # self.pooling_mhsa_fsq1 = pooling_mhsa(dim[3])
+        
 
         self.f4 = nn.Linear(dim[0], dim[0], bias=qkv_bias)
         self.f3 = nn.Linear(dim[1], dim[1], bias=qkv_bias)
@@ -331,15 +332,15 @@ class hypercorre_topk2(nn.Module):
         self.f2p = nn.Linear(dim[2], dim[2], bias=qkv_bias)
         self.f1p = nn.Linear(dim[3], dim[3], bias=qkv_bias)
 
-        self.f4pv = nn.Linear(dim[0], dim[0], bias=qkv_bias)
-        self.f3pv = nn.Linear(dim[1], dim[1], bias=qkv_bias)
-        self.f2pv = nn.Linear(dim[2], dim[2], bias=qkv_bias)
-        self.f1pv = nn.Linear(dim[3], dim[3], bias=qkv_bias)
+        # self.f4pv = nn.Linear(dim[0], dim[0], bias=qkv_bias)
+        # self.f3pv = nn.Linear(dim[1], dim[1], bias=qkv_bias)
+        # self.f2pv = nn.Linear(dim[2], dim[2], bias=qkv_bias)
+        # self.f1pv = nn.Linear(dim[3], dim[3], bias=qkv_bias)
 
-        self.f4psv = nn.Linear(dim[0], dim[0], bias=qkv_bias)
-        self.f3psv = nn.Linear(dim[1], dim[1], bias=qkv_bias)
-        self.f2psv = nn.Linear(dim[2], dim[2], bias=qkv_bias)
-        self.f1psv = nn.Linear(dim[3], dim[3], bias=qkv_bias)
+        # self.f4psv = nn.Linear(dim[0], dim[0], bias=qkv_bias)
+        # self.f3psv = nn.Linear(dim[1], dim[1], bias=qkv_bias)
+        # self.f2psv = nn.Linear(dim[2], dim[2], bias=qkv_bias)
+        # self.f1psv = nn.Linear(dim[3], dim[3], bias=qkv_bias)
         
         self.pooling_proj_linear = nn.Linear(1024,256)
         self.pooling_proj_linear_1 = nn.Linear(1024,256)
@@ -379,6 +380,9 @@ class hypercorre_topk2(nn.Module):
         supp_frame=supp_frame[::-1]
         query_qkv_all=[]
         query_shape_all=[]
+        
+        # print('check2',[i.shape for i in query_frame])
+        # exit()
 
         # B,num_clips,cx,hx,wx=query_frame[0].shape
         # query_frame_selected = query_frame[0].permute(0,1,3,4,2).reshape(B,num_clips,-1,cx)
@@ -536,46 +540,46 @@ class hypercorre_topk2(nn.Module):
 
         # last1_features_cat = torch.cat(last1_features,dim=3)
         
-        p1_features.append(self.pooling_mhsa_fsq1(query_frame[0][:,2:3],[1,2,3,4]))
-        p1_features.append(self.pooling_mhsa_fsq2(query_frame[1][:,2:3],[2,4,6,8]))
-        p1_features.append(self.pooling_mhsa_fsq3(query_frame[2][:,2:3],[4,8,12,16]))
-        p1_features.append(self.pooling_mhsa_fsq4(query_frame[3][:,2:3],[8,16,24,32]))
+        # p1_features.append(self.pooling_mhsa_fsq1(query_frame[0][:,2:3],[1,2,3,4]))
+        # p1_features.append(self.pooling_mhsa_fsq2(query_frame[1][:,2:3],[2,4,6,8]))
+        # p1_features.append(self.pooling_mhsa_fsq3(query_frame[2][:,2:3],[4,8,12,16]))
+        # p1_features.append(self.pooling_mhsa_fsq4(query_frame[3][:,2:3],[8,16,24,32]))
 
-        last3_features_cat = torch.cat(p1_features,dim=3)
+        # last3_features_cat = torch.cat(p1_features,dim=3)
 
         for ii in range(0,4): #according to ratio
-            for fi in range(1,len(query_frame)-1): #according to frame t-3 t-6 t-9 1 3 6 
+            for fi in range(1,len(query_frame)-1):  #t-9 t-6 t-3 t
                 if ii==0 and fi==1:
-                    last_feature = self.pooling_mhsa_fk1(query_frame[ii][:,fi:fi+1],[1,2,3,4])
+                    last_feature = self.pooling_mhsa_fk1(query_frame[ii][:,fi-1:fi],[1,2,3,4])
                     last_feature_p = self.pk1(last_feature)
-                    p_features.append(last_feature_p)
+                    # p_features.append(last_feature_p)
                     # last_feature_fv1=self.pooling_mhsa_fv1(query_frame[ii][:,fi:fi+1],[1,2,3,4])
                     last_feature_f1=self.f1p(last_feature)
-                    last_features_cat6.append(last_feature)
+                    last_features_cat6.append(last_feature_f1)
                 elif ii==1 and fi==1:
-                    last_feature = self.pooling_mhsa_fk2(query_frame[ii][:,fi:fi+1],[2,4,6,8])
+                    last_feature = self.pooling_mhsa_fk2(query_frame[ii][:,fi-1:fi],[2,4,6,8])
                     last_feature_p = self.pk2(last_feature)
-                    p_features.append(last_feature_p)
+                    # p_features.append(last_feature_p)
                     # last_feature_fv2=self.pooling_mhsa_fv2(query_frame[ii][:,fi:fi+1],[2,4,6,8])
                     last_feature_f2=self.f2p(last_feature)
-                    last_features_cat6.append(last_feature)
+                    last_features_cat6.append(last_feature_f2)
                 elif ii==2 and fi==1:
-                    last_feature = self.pooling_mhsa_fk3(query_frame[ii][:,fi:fi+1],[4,8,12,16])
+                    last_feature = self.pooling_mhsa_fk3(query_frame[ii][:,fi-1:fi],[4,8,12,16])
                     last_feature_p = self.pk3(last_feature)
-                    p_features.append(last_feature_p)
+                    # p_features.append(last_feature_p)
                     # last_feature_fv3=self.pooling_mhsa_fv3(query_frame[ii][:,fi:fi+1],[4,8,12,16])
                     last_feature_f3=self.f3p(last_feature)
-                    last_features_cat6.append(last_feature)
+                    last_features_cat6.append(last_feature_f3)
                 elif ii==3 and fi==1:
-                    last_feature = self.pooling_mhsa_fk4(query_frame[ii][:,fi:fi+1],[8,16,24,32])
+                    last_feature = self.pooling_mhsa_fk4(query_frame[ii][:,fi-1:fi],[8,16,24,32])
                     last_feature_p = self.pk4(last_feature)
-                    p_features.append(last_feature_p)
+                    # p_features.append(last_feature_p)
                     # last_feature_fv4=self.pooling_mhsa_fv4(query_frame[ii][:,fi:fi+1],[8,16,24,32])
                     last_feature_f4=self.f4p(last_feature)
-                    last_features_cat6.append(last_feature)
+                    last_features_cat6.append(last_feature_f4)
 
                 # print('qqqkkk',ii,fi,query_qkv_all[ii][:,fi-1:fi].shape,last_feature_p.transpose(2,3).shape)
-                step_atten = torch.matmul(query_qkv_all[ii][:,fi-1:fi],last_feature_p.transpose(2,3)) #qk
+                step_atten = torch.matmul(query_qkv_all[ii][:,fi:fi+1],last_feature_p.transpose(2,3)) #qk
 
                 # store intermediate atten for hpn
                 if fi == 1:
@@ -595,12 +599,6 @@ class hypercorre_topk2(nn.Module):
                         qkv = torch.matmul(step_atten,last_feature_f4)
                 else:
                     qkv = torch.matmul(step_atten,last_feature_v)
-                    
-
-                if fi == 1:
-                    atten_store_1.append(qkv)
-                else:
-                    atten_store_2.append(qkv)
 
                 
                 if ii==0 and fi==1:
@@ -608,25 +606,25 @@ class hypercorre_topk2(nn.Module):
                     last_feature_p = self.i1(pooling_feature) 
                     # pooling_fv1=self.pooling_mhsa_sv1(qkv.permute(0,1,4,2,3),[1,2,3,4]) 
                     last_feature_v = self.iv1(pooling_feature)
-                    last_features_cat3.append(last_feature)  
+                    last_features_cat3.append(last_feature_v)  
                 elif ii==1 and fi==1:
                     pooling_feature = self.pooling_mhsa_sk2(qkv.permute(0,1,4,2,3),[2,4,6,8])
                     last_feature_p = self.i2(pooling_feature)
                     # pooling_fv2=self.pooling_mhsa_sv2(qkv.permute(0,1,4,2,3),[2,4,6,8]) 
                     last_feature_v = self.iv2(pooling_feature)
-                    last_features_cat3.append(last_feature)
+                    last_features_cat3.append(last_feature_v)
                 elif ii==2 and fi==1:
                     pooling_feature = self.pooling_mhsa_sk3(qkv.permute(0,1,4,2,3),[4,8,12,16])
                     last_feature_p = self.i3(pooling_feature)
                     # pooling_fv3=self.pooling_mhsa_sv3(qkv.permute(0,1,4,2,3),[4,8,12,16])  
                     last_feature_v = self.iv3(pooling_feature)
-                    last_features_cat3.append(last_feature)
+                    last_features_cat3.append(last_feature_v)
                 elif ii==3 and fi==1:
                     pooling_feature = self.pooling_mhsa_sk4(qkv.permute(0,1,4,2,3),[8,16,24,32])
                     last_feature_p = self.i4(pooling_feature)
                     # pooling_fv4=self.pooling_mhsa_sv4(qkv.permute(0,1,4,2,3),[8,16,24,32])  
                     last_feature_v = self.iv4(pooling_feature)
-                    last_features_cat3.append(last_feature)
+                    last_features_cat3.append(last_feature_v)
 
             from_t.append(qkv)
 

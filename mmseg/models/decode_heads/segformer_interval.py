@@ -139,7 +139,6 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         # if type(out_to) != 'tensor':
         #     print('oo',out.shape)
         #     exit()
-        # print('o',out.shape)
         # print('memory',memoryFeature.shape)
         if self.training:
             return out,memoryFeature

@@ -2182,7 +2182,7 @@ class CustomDataset_video2(Dataset):
 
         # print('test',len(imglist[:30:1]))
 
-        for i in list(range(len(imglist[:15:1]))):
+        for i in list(range(len(imglist[:13:1]))):
         # for i in this_step:
             img_name=imglist[i]
             img_info=dict(filename=img_name)
