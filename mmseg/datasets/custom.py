@@ -2182,7 +2182,7 @@ class CustomDataset_video2(Dataset):
 
         # print('test',len(imglist[:30:1]))
 
-        for i in list(range(len(imglist[:13:1]))):
+        for i in list(range(len(imglist[:9:1]))):
         # for i in this_step:
             img_name=imglist[i]
             img_info=dict(filename=img_name)
@@ -2371,7 +2371,7 @@ class CustomDataset_video2(Dataset):
                 img_norm_cfg_clips.append(results["img_norm_cfg"])
         else:
             # print(max(0,this_step[-1]-15),this_step[-1])
-            for i in range(max(0,this_step[-1]-15),this_step[-1]):
+            for i in range(max(0,this_step[-1]-9),this_step[-1]):
                 # print('i am in',idx,this_step,i)
                 img_name=imglist[i]
                 img_info=dict(filename=img_name)

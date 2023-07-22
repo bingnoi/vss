@@ -24,6 +24,7 @@ import time
 from ..builder import build_loss
 from torch.nn import functional as F
 
+import math
 
 class MLP(nn.Module):
     """
@@ -167,7 +168,16 @@ class pooling_mhsa(nn.Module):
         
         return pools
         
+def softmax_w_top(x, top=20):
+    print('x',x.shape)
+    x = x.squeeze(1)
+    values, indices = torch.topk(x, k=top, dim=1)
+    x_exp = values.exp_()
 
+    x_exp /= torch.sum(x_exp, dim=1, keepdim=True)
+    x.zero_().scatter_(1, indices, x_exp) # B * THW * HW
+
+    return x
 
 @HEADS.register_module()
 class SegFormerHead_clipsNet(BaseDecodeHead_clips):
@@ -227,6 +237,11 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # self.deco4=small_decoder2(embedding_dim,256, self.num_classes)
 
         self.hypercorre_module=hypercorre_topk2(dim=self.in_channels, backbone=self.backbone)
+        
+        self.refine_block = nn.Sequential(
+            # nn.Conv2d(512,512,kernel_size=3, stride=1, padding=1, bias=False),
+            nn.LayerNorm(512)
+        )
 
         reference_size="1_32"   ## choices: 1_32, 1_16
         if reference_size=="1_32":
@@ -285,7 +300,29 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         
     #     self.memory.data = out
     #     query_frame[0] = out
+    
+    
+    def global_matching(self,mk,qk):
+        B, CK, _,_ = mk.shape
         
+        mk = mk.flatten(start_dim=2)
+        # print('q',qk.shape)
+        qk = qk.flatten(start_dim=3)
+
+        a = mk.pow(2).sum(1).unsqueeze(2)
+        
+        # print(mk.transpose(1, 2).shape,qk.shape)
+        b = 2 * (mk.transpose(1, 2) @ qk)
+        # We don't actually need this, will update paper later
+        # c = qk.pow(2).expand(B, -1, -1).sum(1).unsqueeze(1)
+
+        affinity = (-a+b) / math.sqrt(CK)  # B, NE, HW
+        affinity = softmax_w_top(affinity,top=20)  # B, THW, HW
+
+        return affinity
+    
+    def read_out(self,affinity,mv):
+        return torch.bmm(mv, affinity)
 
     def forward_features(self,feats,inputs, batch_size=None, num_clips=None):
         #每一层特征下做down_sample,按通道cancat,每一次s*c->s*4c
@@ -367,25 +404,43 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # query_c4=query_c4.reshape(batch_size, (num_clips-1), -1, query_c4.shape[-2], query_c4.shape[-1])
         
         B,num_clips_select,cx,hx,wx=supp_c4.shape
+        
+        # store_c4 = supp_c4
         # print('c42 ',query_c4.shape)
         
-        # if self.training:
         if len(feats)>0:
-            supp_frame_selected = supp_c4.permute(0,2,3,1).reshape(B,-1,cx)
+            supp_frame_selected = supp_c4.permute(0,1,3,4,2)
             # print('ss ',query_c4[:,i].shape)
-            supp_frame_selected = self.linear1(supp_frame_selected) #b,-1,cx
+            supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx*wx,cx)) #b,-1,cx
             
             # B,feats_num_clips,cx,hx,wx=feats.shape 
             # print('f ',feats.shape)
             B,cx,hx,wx=feats.shape 
-            memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,-1,cx))
+            # print('f',feats.shape)
+            memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
 
             # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
             
-            atten = torch.matmul(memory_feature,supp_frame_selected.transpose(-1,-2))
+            atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2))
 
             #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
+            # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
+            # print('ts',torch.matmul(atten,memory_feature).shape)
+            
             supp_c4 = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
+            
+            # affinity = self.global_matching(feats,supp_c4)
+            # readout_mem = self.read_out(affinity.expand(k,-1,-1),feats)
+            # print('tes',readout_mem.shape)
+            # exit()
+            # print('f1 ',supp_c4.shape)
+            # supp_c4 = self.refine_block(supp_c4)
+            # print('f2 ',supp_c4.shape)
+            # exit()
+            
+            supp_c4 = supp_c4.unsqueeze(1)
+            
+            # supp_c4 = supp_c4 + store_c4
         
         
         supp_frame = [supp_c1, supp_c2, supp_c3, supp_c4]

@@ -92,8 +92,11 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         #     out_to.append(out)
         
         # out = None
-        
-        
+        former_frame = 0
+        skip_frame = 0
+        if memory != None:
+            skip_frame = 5
+            former_frame = 8
         # 第一是可能出现overlap,第二是可能出现0-5帧的重复更新特征
         if frame_len < frame_gap_l:
             memoryFeature = []
@@ -107,18 +110,20 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
             # exit()
         else:
             for i in range(frame_len):
-                if i == 0:
-                    if memory == None:
-                        memoryFeature = self.memory(mode='init_memory',feats=inputs[-1][:5,:])
-                    else:
-                        memoryFeature = self.memory(mode='set_memory',feats=memory.squeeze(0))
+                if i == 0 and memory == None:
+                    # print("set memory ",i)
+                    memoryFeature = self.memory(mode='init_memory',feats=inputs[-1][:num_infer,:])
+                elif (i+skip_frame)==former_frame and memory != None:
+                    memoryFeature = self.memory(mode='set_memory',feats=memory.squeeze(0))
                     # print('ss1 ',i,memory==None,memoryFeature==None)
-                elif i%num_infer==0 and i>num_infer:
+                if (i+skip_frame)%num_infer==0 and (i+skip_frame)>num_infer and (i+skip_frame)>former_frame:
                     # num_digit = i / 10
                     # num_decimal = i % 10
                     # carry = 1 if num_decimal>=5 else 0
                     # print('qqqqq ',i,frame_len,int(i/5-1)*5,int((i/5)*5))
-                    memoryFeature = self.memory(mode ='update_memory',feats=inputs[-1][int((i/5-1)*5):int((i/5)*5),:])
+                    # print('sss',int((i/num_infer-1)*num_infer),int((i/num_infer)*num_infer))
+                    # print("update memory ",i)
+                    memoryFeature = self.memory(mode ='update_memory',feats=inputs[-1][int((i/num_infer-1)*num_infer):int((i/num_infer)*num_infer),:])
                 # if memoryFeature != None:
                 #     print(i,memoryFeature.shape)
                 #     print('ss2 ',i,memory.shape)
@@ -131,7 +136,8 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
                     out = self.net(mode='segment',feats=memoryFeature,inputs=frame_in,batch_size=1,num_clips=4)
                     # print('o2 ',out.shape,frame_len)
                     out_to.append(out)
-                    
+                    # print("predict",i)
+            # exit()   
             # print('ot',len(out_to))
             
         

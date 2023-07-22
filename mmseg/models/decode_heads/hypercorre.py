@@ -356,8 +356,6 @@ class hypercorre_topk2(nn.Module):
         self.linear1 = nn.Linear(dim[3], dim[3], bias=qkv_bias)
         self.linear2 = nn.Linear(512, 512, bias=qkv_bias)
 
-        self.memory = nn.Parameter(torch.zeros([1,3,512,15,15]), requires_grad = False)
-
         self.k_top=5
         if backbone=='b0':
             self.threh=0.8
