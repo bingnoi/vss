@@ -303,7 +303,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         super(BaseDecodeHead_clips, self).__init__()
         self._init_inputs(in_channels, in_index, input_transform)
         self.channels = channels
-        self.num_infer = num_infer,
+        self.num_infer = num_infer
         self.num_classes = num_classes
         self.dropout_ratio = dropout_ratio
         self.conv_cfg = conv_cfg
@@ -414,7 +414,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         """Placeholder of forward function."""
         pass
 
-    def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg,batch_size, num_clips):
+    def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg,batch_size, num_clips,memory):
         """Forward function for training.
         Args:
             inputs (list[Tensor]): List of multi-level img features.
@@ -430,11 +430,9 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
-        
-        seg_logits = self.forward(inputs,batch_size, num_clips)
+        seg_logits,memory = self.forward(inputs,batch_size, num_clips,memory)
         losses = self.losses(seg_logits, gt_semantic_seg)
-        # print('hello ')
-        return losses
+        return losses,memory
 
     def forward_test(self, inputs, img_metas, test_cfg, batch_size=None, num_clips=None):
         """Forward function for testing.
@@ -451,7 +449,9 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         Returns:
             Tensor: Output segmentation map.
         """
-        return self.forward(inputs, batch_size, num_clips)
+        memory=None
+        # print('clip',num_clips)
+        return self.forward(inputs, batch_size, num_clips,memory)
 
     def cls_seg(self, feat):
         """Classify each pixel."""
@@ -550,12 +550,12 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                 frame_selected_last = []
                 frame_selected_last3 = []
                 frame_selected_all = []
-                for i in range(frame_len-frame_gap_l):
-                    frame_selected_last.append(list(range(i,i+frame_gap_l,frame_gap))[3])
-                for i in range(frame_len-frame_gap_l):
-                    frame_selected_last3.append(list(range(i,i+frame_gap_l,frame_gap))[:3])
-                for i in range(frame_len-frame_gap_l):
-                    frame_selected_all.append(list(range(i,i+frame_gap_l,frame_gap))) 
+                for i in range(frame_gap_l-1,frame_len):
+                    frame_selected_last.append(list(range(i-frame_gap_l+1,i+1,frame_gap))[3])
+                for i in range(frame_gap_l-1,frame_len):
+                    frame_selected_last3.append(list(range(i-frame_gap_l+1,i+1,frame_gap))[:3])
+                for i in range(frame_gap_l-1,frame_len):
+                    frame_selected_all.append(list(range(i-frame_gap_l+1,i+1,frame_gap))) 
                     
                 # print('sfrs',seg_label.shape)
                     
@@ -575,6 +575,11 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                 # print('sssssssssss',seg_logit.shape)
                 batch_size, _,c, h ,w=seg_logit.shape
                 seg_logit = seg_logit.reshape(batch_size,-1,8,c,h,w)
+                # print('tt',series,seg_logit.shape[1])
+                # print(frame_selected_last)
+                # print(frame_selected_last3)
+                # print(frame_selected_all)
+                # exit()
                 assert series == seg_logit.shape[1]
                 
                 # seg_logit_ori = []
@@ -703,15 +708,18 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             #     weight=seg_weight,
             #     ignore_index=self.ignore_index
             #     )
-            loss['loss_seg'] = 0.5*self.loss_decode(
+            
+            a = 0.2
+            b = 0.2
+            loss['loss_seg'] = a*self.loss_decode(
                 seg_logit_ori,
                 seg_label_ori,
                 weight=seg_weight,
-                ignore_index=self.ignore_index)+self.loss_decode(
+                ignore_index=self.ignore_index)+b*self.loss_decode(
                 seg_logit_last3frame,
                 seg_label_last3frame,
                 weight=seg_weight,
-                ignore_index=self.ignore_index)+0.5*self.loss_decode(
+                ignore_index=self.ignore_index)+(1-a-b)*self.loss_decode(
                 seg_logit_lastframe,
                 seg_label_lastframe,
                 weight=seg_weight,

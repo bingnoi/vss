@@ -41,12 +41,13 @@ class Evaluator(object):
 
     def _generate_matrix(self, gt_image, pre_image):
         mask = (gt_image >= 0) & (gt_image < self.num_class)
-        #print(mask)
-        #print(gt_image.shape)
-        #print(gt_image[mask])
+        # print(mask)
+        # print(gt_image.shape)
+        # print(gt_image[mask])
         label = self.num_class * gt_image[mask].astype('int') + pre_image[mask]
-#        print(label.shape)
+        # print(label.shape)
         count = np.bincount(label, minlength=self.num_class**2)
+        # print(len(count),self.num_class)
         confusion_matrix = count.reshape(self.num_class, self.num_class)
         return confusion_matrix
 
@@ -200,6 +201,7 @@ def total_intersect_and_union(results,
 
     num_imgs = len(results)
     assert len(gt_seg_maps) == num_imgs
+    # print(gt_seg_maps.shape)
     total_area_intersect = np.zeros((num_classes, ), dtype=np.float)
     total_area_union = np.zeros((num_classes, ), dtype=np.float)
     total_area_pred_label = np.zeros((num_classes, ), dtype=np.float)

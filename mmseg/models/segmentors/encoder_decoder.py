@@ -379,18 +379,16 @@ class EncoderDecoder_clips(BaseSegmentor):
             align_corners=self.align_corners)
         return out
 
-    def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg,batch_size, num_clips):
+    def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg,batch_size, num_clips,memory):
         """Run forward function and calculate loss for decode head in
         training."""
         losses = dict()
-        loss_decode = self.decode_head.forward_train(x, img_metas,
+        loss_decode,memory = self.decode_head.forward_train(x, img_metas,
                                                      gt_semantic_seg,
-                                                     self.train_cfg,batch_size, num_clips)
-        
-        # print("check1")
+                                                     self.train_cfg,batch_size, num_clips,memory)
 
         losses.update(add_prefix(loss_decode, 'decode'))
-        return losses
+        return losses,memory
 
     def _decode_head_forward_test(self, x, img_metas, batch_size, num_clips):
         """Run forward function and calculate loss for decode head in
@@ -421,7 +419,7 @@ class EncoderDecoder_clips(BaseSegmentor):
 
         return seg_logit
 
-    def forward_train(self, img, img_metas, gt_semantic_seg):
+    def forward_train(self, memory,img, img_metas, gt_semantic_seg):
         """Forward function for training.
 
         Args:
@@ -457,13 +455,8 @@ class EncoderDecoder_clips(BaseSegmentor):
 
         losses = dict()
 
-        loss_decode = self._decode_head_forward_train(x, img_metas,
-                                                      gt_semantic_seg,batch_size, num_clips)
-        # {'loss': tensor(49.4864, device='cuda:0', grad_fn=<AddBackward0>), 
-        # 'log_vars': OrderedDict([('decode.loss_seg', 41.86023712158203), 
-        # ('decode.acc_seg', 0.37628173828125), ('loss', 41.86023712158203)]), 'num_samples': 1}
-        
-        # print("check2")
+        loss_decode,memory = self._decode_head_forward_train(x, img_metas,
+                                                      gt_semantic_seg,batch_size, num_clips,memory)
         losses.update(loss_decode)
         # print("check3")
         
@@ -475,7 +468,7 @@ class EncoderDecoder_clips(BaseSegmentor):
             
         # print("check4")
 
-        return losses
+        return losses,memory
 
     # TODO refactor
     def slide_inference(self, img, img_meta, rescale, batch_size, num_clips):
@@ -594,8 +587,12 @@ class EncoderDecoder_clips(BaseSegmentor):
 
         img=img.reshape(batch_size*num_clips, -1, h,w)
         # exit()
+        # print('iii',img.shape)
         seg_logit = self.inference(img, img_meta, rescale, batch_size, num_clips)
+        # print('sss',seg_logit.shape)
         seg_pred = seg_logit.argmax(dim=1)
+        # print('ppp',seg_pred.shape)
+        # exit()
         if torch.onnx.is_in_onnx_export():
             # our inference backend only support 4D output
             seg_pred = seg_pred.unsqueeze(0)
