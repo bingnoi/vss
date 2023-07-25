@@ -24,7 +24,7 @@ def np2tmp(array, temp_file_name=None):
     Returns:
         str: The numpy file name.
     """
-    tempfile.tempdir= '/datadisk/tmpfile/'
+    tempfile.tempdir= '/media/gpu/tmp'
 
     if temp_file_name is None:
         temp_file_name = tempfile.NamedTemporaryFile(

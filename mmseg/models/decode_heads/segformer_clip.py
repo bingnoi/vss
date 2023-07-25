@@ -413,15 +413,13 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
             # print('ss ',query_c4[:,i].shape)
             supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx*wx,cx)) #b,-1,cx
             
-            # B,feats_num_clips,cx,hx,wx=feats.shape 
-            # print('f ',feats.shape)
-            B,cx,hx,wx=feats.shape 
-            # print('f',feats.shape)
-            memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
-
-            # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
+            # B,cx,hx,wx=feats.shape 
+            B,cx=feats.shape 
             
-            atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2))
+            # memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
+            memory_feature = self.linear2(feats)
+            
+            atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
 
             #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
             # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
