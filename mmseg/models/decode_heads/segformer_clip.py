@@ -408,37 +408,37 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # store_c4 = supp_c4
         # print('c42 ',query_c4.shape)
         
-        if len(feats)>0:
-            supp_frame_selected = supp_c4.permute(0,1,3,4,2)
-            # print('ss ',query_c4[:,i].shape)
-            supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx*wx,cx)) #b,-1,cx
+        # if len(feats)>0:
+        #     supp_frame_selected = supp_c4.permute(0,1,3,4,2)
+        #     # print('ss ',query_c4[:,i].shape)
+        #     supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx*wx,cx)) #b,-1,cx
             
-            # B,cx,hx,wx=feats.shape 
-            B,cx=feats.shape 
+        #     # B,cx,hx,wx=feats.shape 
+        #     B,cx=feats.shape 
             
-            # memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
-            memory_feature = self.linear2(feats)
+        #     # memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
+        #     memory_feature = self.linear2(feats)
             
-            atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
+        #     atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
 
-            #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-            # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
-            # print('ts',torch.matmul(atten,memory_feature).shape)
+        #     #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
+        #     # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
+        #     # print('ts',torch.matmul(atten,memory_feature).shape)
             
-            supp_c4 = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
+        #     supp_c4 = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
             
-            # affinity = self.global_matching(feats,supp_c4)
-            # readout_mem = self.read_out(affinity.expand(k,-1,-1),feats)
-            # print('tes',readout_mem.shape)
-            # exit()
-            # print('f1 ',supp_c4.shape)
-            # supp_c4 = self.refine_block(supp_c4)
-            # print('f2 ',supp_c4.shape)
-            # exit()
+        #     # affinity = self.global_matching(feats,supp_c4)
+        #     # readout_mem = self.read_out(affinity.expand(k,-1,-1),feats)
+        #     # print('tes',readout_mem.shape)
+        #     # exit()
+        #     # print('f1 ',supp_c4.shape)
+        #     # supp_c4 = self.refine_block(supp_c4)
+        #     # print('f2 ',supp_c4.shape)
+        #     # exit()
             
-            supp_c4 = supp_c4.unsqueeze(1)
+        #     supp_c4 = supp_c4.unsqueeze(1)
             
-            # supp_c4 = supp_c4 + store_c4
+        #     # supp_c4 = supp_c4 + store_c4
         
         
         supp_frame = [supp_c1, supp_c2, supp_c3, supp_c4]
@@ -527,6 +527,69 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         supp_feats=[ii.squeeze(1) for ii in supp_feats]
 
         outs=supp_feats
+        
+        if len(feats)>0:
+            supp_frame_selected = outs[3].unsqueeze(1).permute(0,1,3,4,2)
+            # print('ss ',query_c4[:,i].shape)
+            supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx*wx,cx)) #b,-1,cx
+            
+            # B,cx,hx,wx=feats.shape 
+            B,cx=feats.shape 
+            
+            # memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
+            memory_feature = self.linear2(feats)
+            
+            atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
+
+            #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
+            # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
+            # print('ts',torch.matmul(atten,memory_feature).shape)
+            
+            supp_c4 = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
+        
+        outs[3] = supp_c4 
+           
+            # supp_c4 = supp_c4 + store_c4
+            
+            # in_1 = outs[3]
+            # in_2 = feats
+
+            # # if self.fusion_strategy in ["sigmoid-do1", "sigmoid-do2", "sigmoid-do3", "concat"]:
+
+            # in_1 = self.bn1(in_1)
+            # in_1 = self.dropout1(in_1)
+            # in_1 = F.relu(in_1, inplace=False)
+
+            # in_2 = self.bn2(in_2)
+            # in_2 = self.dropout2(in_2)
+            # in_2 = F.relu(in_2, inplace=False)
+
+            # fused_mem = torch.cat([in_1, in_2], dim=1)
+
+            # if self.fusion_strategy != "concat":
+            #     if self.fusion_strategy == "sigmoid-do3":
+            #         att = self.conv_layer_34(fused_mem)
+            #     else:
+            #         att_1 = self.conv_layer_3(fused_mem)
+            #         att_2 = self.conv_layer_4(fused_mem)
+
+            #     out_1 = self.conv_layer_1(in_1)
+            #     out_2 = self.conv_layer_2(in_2)
+
+            #     if self.fusion_strategy in ["sigmoid", "sigmoid-do1", "sigmoid-do2"]:
+            #         out_1 *= torch.sigmoid(att_1)
+            #         out_2 *= torch.sigmoid(att_2)
+            #     elif self.fusion_strategy == "sigmoid-do3":
+            #         out_1 *= torch.sigmoid(att)
+            #         out_2 *= torch.sigmoid(att)
+            #     else:
+            #         out_1 *= att_1
+            #         out_2 *= att_2
+
+            #     fused_mem = out_1 + out_2
+            #     if not self.nobn:
+            #         fused_mem = self.bn(fused_mem)
+            #     fused_mem = F.relu(fused_mem, inplace=self.nobn)
         
 
         # ends here !!!!!!
