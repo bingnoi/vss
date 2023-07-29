@@ -26,6 +26,8 @@ from torch.nn import functional as F
 
 import math
 
+from .correlation import FunctionCorrelation, FunctionCorrelationTranspose
+
 class MLP(nn.Module):
     """
     Linear Embedding
@@ -167,17 +169,6 @@ class pooling_mhsa(nn.Module):
         pools = pools.reshape(B,N,-1,C)
         
         return pools
-        
-def softmax_w_top(x, top=20):
-    print('x',x.shape)
-    x = x.squeeze(1)
-    values, indices = torch.topk(x, k=top, dim=1)
-    x_exp = values.exp_()
-
-    x_exp /= torch.sum(x_exp, dim=1, keepdim=True)
-    x.zero_().scatter_(1, indices, x_exp) # B * THW * HW
-
-    return x
 
 @HEADS.register_module()
 class SegFormerHead_clipsNet(BaseDecodeHead_clips):
@@ -300,29 +291,6 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         
     #     self.memory.data = out
     #     query_frame[0] = out
-    
-    
-    def global_matching(self,mk,qk):
-        B, CK, _,_ = mk.shape
-        
-        mk = mk.flatten(start_dim=2)
-        # print('q',qk.shape)
-        qk = qk.flatten(start_dim=3)
-
-        a = mk.pow(2).sum(1).unsqueeze(2)
-        
-        # print(mk.transpose(1, 2).shape,qk.shape)
-        b = 2 * (mk.transpose(1, 2) @ qk)
-        # We don't actually need this, will update paper later
-        # c = qk.pow(2).expand(B, -1, -1).sum(1).unsqueeze(1)
-
-        affinity = (-a+b) / math.sqrt(CK)  # B, NE, HW
-        affinity = softmax_w_top(affinity,top=20)  # B, THW, HW
-
-        return affinity
-    
-    def read_out(self,affinity,mv):
-        return torch.bmm(mv, affinity)
 
     def forward_features(self,feats,inputs, batch_size=None, num_clips=None):
         #每一层特征下做down_sample,按通道cancat,每一次s*c->s*4c
@@ -409,36 +377,55 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # print('c42 ',query_c4.shape)
         
         if len(feats)>0:
-            supp_frame_selected = supp_c4.permute(0,1,3,4,2)
-            # print('ss ',query_c4[:,i].shape)
-            supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx*wx,cx)) #b,-1,cx
+            # supp_frame_selected = supp_c4.permute(0,1,3,4,2)
+            # # print('ss ',query_c4[:,i].shape)
+            # supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx*wx,cx)) #b,-1,cx
             
-            # B,cx,hx,wx=feats.shape 
-            B,cx=feats.shape 
+            # # B,cx,hx,wx=feats.shape 
+            # B,cx=feats.shape 
             
-            # memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
-            memory_feature = self.linear2(feats)
+            # # memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
+            # memory_feature = self.linear2(feats)
             
-            atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
+            # atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
 
-            #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-            # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
-            # print('ts',torch.matmul(atten,memory_feature).shape)
+            # #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
+            # # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
+            # # print('ts',torch.matmul(atten,memory_feature).shape)
             
-            supp_c4 = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
+            # supp_c4 = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
             
-            # affinity = self.global_matching(feats,supp_c4)
-            # readout_mem = self.read_out(affinity.expand(k,-1,-1),feats)
-            # print('tes',readout_mem.shape)
-            # exit()
-            # print('f1 ',supp_c4.shape)
-            # supp_c4 = self.refine_block(supp_c4)
-            # print('f2 ',supp_c4.shape)
-            # exit()
+            # # affinity = self.global_matching(feats,supp_c4)
+            # # readout_mem = self.read_out(affinity.expand(k,-1,-1),feats)
+            # # print('tes',readout_mem.shape)
+            # # exit()
+            # # print('f1 ',supp_c4.shape)
+            # # supp_c4 = self.refine_block(supp_c4)
+            # # print('f2 ',supp_c4.shape)
+            # # exit()
             
-            supp_c4 = supp_c4.unsqueeze(1)
+            # supp_c4 = supp_c4.unsqueeze(1)
             
-            # supp_c4 = supp_c4 + store_c4
+            B, D_e, T, H, W = m_in.size()
+            _, D_o, _, _, _ = m_out.size()
+
+            patch_size = self.corr_size
+
+            p = torch.stack([FunctionCorrelation(supp_c4.contiguous(), feats[:,:,t,:,:].contiguous(), patch_size) for t in range(T)], dim=2) # B, N^2, T, H, W
+            p = p.reshape(B, -1, H, W) # B, T*N^2, H, W
+            if self.learnable_constant:
+                p = torch.cat([p, self.const.view(1, 1, 1, 1).expand(B, -1, H, W)], dim=1)
+            p = F.softmax(p, dim=1)
+            if self.learnable_constant:
+                p = p[:, :-1, :, :]
+            p = p.reshape(B, -1, T, H, W) # B, N^2, T, H, W
+
+            p_volume = None
+            # p_volume = torch.stack([self.remap_cost_volume(p[:,:,t,:,:]) for t in range(T)], dim=1)
+
+            mem = sum([FunctionCorrelationTranspose(p[:,:,t,:,:].contiguous(), feats[:,:,t,:,:].contiguous(), patch_size) for t in range(T)])
+            
+            supp_c4 = mem
         
         
         supp_frame = [supp_c1, supp_c2, supp_c3, supp_c4]

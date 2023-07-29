@@ -8,9 +8,8 @@ import torch.nn.functional as F
 class FeatureMemory(nn.Module):
     def __init__(self) -> None:
         super(FeatureMemory,self).__init__()
-        # self.memory = nn.Parameter(torch.zeros([1,512,15,15]), requires_grad = False)
+        # self.memory = nn.Parameter(torch.zeros([1,5,512,15,15]), requires_grad = False)
         self.memory = nn.Parameter(torch.zeros([1,512]), requires_grad = True)
-        self.memoryqueue = nn.Parameter(torch.zeros([1,5,512,15,15]), requires_grad = True)
         
         self.linear1 = nn.Linear(512,512)
         self.linear2 = nn.Linear(512,512)
@@ -58,49 +57,41 @@ class FeatureMemory(nn.Module):
         
     def init_memory(self,feats):
         #print(feats.shape)
+        feats = self.handle_squeeze(feats)
         
-        # feats = self.handle_squeeze(feats)
-        # self.memory.data = feats
-        # return self.memory.data
-        
-        self.memoryqueue = feats
-        return feats
+        self.memory.data = feats
+        return self.memory.data
 
     def update_memory(self,feats):
-        # B,n,cx,hx,wx = feats.shape
+        B,n,cx,hx,wx = feats.shape
         
-        # feats = self.handle_squeeze(feats)
+        feats = self.handle_squeeze(feats)
         
-        # # feats = feats.reshape(B,cx,hx*wx).permute(0,2,1)
-        # feats = feats.reshape(B,cx)
+        # feats = feats.reshape(B,cx,hx*wx).permute(0,2,1)
+        feats = feats.reshape(B,cx)
 
         
-        # # print('f',feats.shape) #torch.Size([1, 512, 15, 27])
-        # feats_k = self.linear1(feats)
-        # feats_v = self.linear2(feats)
+        # print('f',feats.shape) #torch.Size([1, 512, 15, 27])
+        feats_k = self.linear1(feats)
+        feats_v = self.linear2(feats)
         
-        # # b_m,c_m,hx_m,wx_m = self.memory.data.shape
-        # # memory_f = self.memory.data.permute(0,2,3,1).reshape(b_m,-1,c_m)
-        # # memory_feature = self.linear3(memory_f)
-
-        # b_m,c_m = self.memory.data.shape
-        # memory_f = self.memory.data
+        # b_m,c_m,hx_m,wx_m = self.memory.data.shape
+        # memory_f = self.memory.data.permute(0,2,3,1).reshape(b_m,-1,c_m)
         # memory_feature = self.linear3(memory_f)
 
-        # # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
-        
-        # atten = torch.matmul(memory_feature,feats_k.transpose(-1,-2)) #b,c b,c,h*w
+        b_m,c_m = self.memory.data.shape
+        memory_f = self.memory.data
+        memory_feature = self.linear3(memory_f)
 
-        # out = torch.matmul(atten,feats_v) #b,h*w b,h*w,c = b,c
-        # # out = torch.matmul(atten,feats_v).permute(0,2,1).reshape(B,cx,hx,wx) #b,h*w b,h*w,c = b,n,h*w,c
+        # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
         
-        # self.memory.data = out
-        # return self.memory.data
-    
-        for i in range(1, 5):
-            self.memoryqueue[:, i - 1, :, :, :] = self.memoryqueue[:, i, :, :, :]
-        self.memoryqueue[:,-1:] = feats
-        return self.memoryqueue
+        atten = torch.matmul(memory_feature,feats_k.transpose(-1,-2)) #b,c b,c,h*w
+
+        out = torch.matmul(atten,feats_v) #b,h*w b,h*w,c = b,c
+        # out = torch.matmul(atten,feats_v).permute(0,2,1).reshape(B,cx,hx,wx) #b,h*w b,h*w,c = b,n,h*w,c
+        
+        self.memory.data = out
+        return self.memory.data
 
     def forward(self,mode,feats):
         # for u in feats:
