@@ -95,8 +95,8 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         former_frame = 0
         skip_frame = 0
         if memory != None:
-            skip_frame = 5
-            former_frame = 8
+            skip_frame = 2 #总长度-1-单次跑的帧
+            former_frame = 8 #单次跑的帧-1
         # 第一是可能出现overlap,第二是可能出现0-5帧的重复更新特征
         if frame_len < frame_gap_l:
             memoryFeature = []
@@ -113,7 +113,7 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
                 if i == 0 and memory == None:
                     # print("set memory ",i)
                     memoryFeature = self.memory(mode='init_memory',feats=inputs[-1][:num_infer,:])
-                elif (i+skip_frame)==former_frame and memory != None:
+                elif ((i+skip_frame)==former_frame or i==0) and memory != None:
                     memoryFeature = self.memory(mode='set_memory',feats=memory.squeeze(0))
                     # print('ss1 ',i,memory==None,memoryFeature==None)
                 if (i+skip_frame)%num_infer==0 and (i+skip_frame)>num_infer and (i+skip_frame)>former_frame:

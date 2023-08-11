@@ -709,8 +709,8 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             #     ignore_index=self.ignore_index
             #     )
             
-            a = 0.2
-            b = 0.2
+            a = 0.1
+            b = 0.1
             loss['loss_seg'] = a*self.loss_decode(
                 seg_logit_ori,
                 seg_label_ori,

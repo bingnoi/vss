@@ -10,7 +10,9 @@ import torch.distributed as dist
 class FeatureMemory(nn.Module):
     def __init__(self) -> None:
         super(FeatureMemory,self).__init__()
-        
+        num_classes = 124
+        num_feats_per_cls = 1
+        feats_channels = 512
         
         # self.memory = nn.Parameter(torch.zeros([1,5,512,15,15]), requires_grad = False)
         self.memory = nn.Parameter(torch.zeros(num_classes,num_feats_per_cls,feats_channels,dtype=torch.float), requires_grad = False)
@@ -33,43 +35,26 @@ class FeatureMemory(nn.Module):
         self.memory.data=feats
         return self.memory.data
     
-    def handle_squeeze(self,feats):
-        b,n,cx,hx,wx = feats.shape
+    def handle_squeeze(self,feats,segmentation,ignore_index=255):
+        pass
         
-        # feats = feats.reshape(b,n*cx,hx,wx)
+    def init_memory(self,feats,segmentation,ignore_index=255):
+        batch_size, num_channels, h, w = feats.size()
         
-        # feats = self.down_linear(feats.reshape(b,n*cx,hx,wx).permute(0,2,3,1)).permute(0,3,1,2)
-        
-        f_first = feats[:,:1]
-        f_later = feats
-        
-        f_first = f_first.permute(0,1,3,4,2).reshape(b,1*hx*wx,cx)
-        f_later = f_later.permute(0,1,3,4,2).reshape(b,n*hx*wx,cx)
-        
-        # print('f',f_later.shape)
-        f_first_q = self.initlinear(f_first)
-        f_later_k = self.initlinear2(f_later)
-        f_later_v = self.initlinear3(f_later)
-        
-        feats_atten = torch.matmul(f_first_q,f_later_k.transpose(-1,-2)) #b,1*hx*wx,cx b,cx,n*hx*wx
-        feats = torch.matmul(feats_atten,f_later_v) #b,hx*wx,n*hx*wx b,n*hx*wx,cx = b,hx*wx,cx
-        
-        feats = feats.reshape(b,hx,wx,cx).permute(0,3,1,2)
-        
-        # feats = torch.mean(feats.reshape(b,cx,-1),dim=2)
-        feats = self.average_pooling(feats)
-        
-        # print('f',feats.shape)
-        # exit()
-        
-        return feats
-        
-    def init_memory(self,feats):
-        #print(feats.shape)
-        feats = self.handle_squeeze(feats)
-        
-        self.memory.data = feats
-        return self.memory.data
+        segmentation = segmentation.long()
+        feats = feats.permute(0,2,3,1).contiguous()
+        feats = feats.view(batch_size*h*w,num_channels)
+        clsids = segmentation.unique()
+        for clsid in clsids:
+            if clsid == ignore_index : continue
+            seg_cls = segmentation.view(-1)
+            feats_cls = feats[seg_cls == clsid]
+            
+            for idx in range(self.num_feats_per_cls):
+                if (self.memory[clsid][idx] == 0).sum() == self.feats_channels:
+                    self.memory[clsid][idx].data.copy_(feats_cls.mean(0))
+                    need_update = False
+                    break
 
     def update_memory_momentum(self,features,segmentation,ignore_index=255, strategy='cosine_similarity', momentum_cfg=None, learning_rate=None):
         assert strategy in ['mean', 'cosine_similarity']
@@ -172,14 +157,14 @@ class FeatureMemory(nn.Module):
         # self.memory.data = out
         # return self.memory.data
 
-    def forward(self,mode,feats):
+    def forward(self,mode,feats,segmentation):
         # for u in feats:
         #     print(u.shape)
         feats = feats.unsqueeze(0)
         
         if mode == 'init_memory':
-            return self.init_memory(feats)#start of epoch,
+            return self.init_memory(feats,segmentation)#start of epoch,
         elif mode == 'update_memory':
-            return self.update_memory(feats)#each frame,todo:对齐元素大小
+            return self.update_memory_momentum(feats,segmentation)#each frame,todo:对齐元素大小
         elif mode == 'set_memory':
             return self.set_memory(feats)#start of iteration,todo:对齐元素大小即可

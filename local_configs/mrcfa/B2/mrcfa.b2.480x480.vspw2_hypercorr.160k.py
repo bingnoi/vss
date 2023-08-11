@@ -10,7 +10,7 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 find_unused_parameters = True
 model = dict(
     type='EncoderDecoder_clips',
-    pretrained='/home/lixinhao/mit_b2.pth',
+    pretrained='/home/lixinhao/original/mit_b2.pth',
     backbone=dict(
         type='mit_b2',
         style='pytorch'),
@@ -37,7 +37,7 @@ model = dict(
     test_cfg=dict(mode='whole'))
 
 # optimizer
-optimizer = dict(_delete_=True, type='AdamW', lr=0.000005 , betas=(0.9, 0.999), weight_decay=0.01,
+optimizer = dict(_delete_=True, type='AdamW', lr=0.000009 , betas=(0.9, 0.999), weight_decay=0.01,
                  paramwise_cfg=dict(custom_keys={'pos_block': dict(decay_mult=0.),
                                                  'norm': dict(decay_mult=0.),
                                                  'head': dict(lr_mult=10.)

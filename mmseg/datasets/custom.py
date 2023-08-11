@@ -2185,7 +2185,7 @@ class CustomDataset_video2(Dataset):
         # print('ttt ',len(self.videolists))
         # print('see',len(imglist))
 
-        for i in list(range(len(imglist[:13:1]))):
+        for i in list(range(len(imglist[:11:1]))):
         # for i in this_step:
             img_name=imglist[i]
             img_info=dict(filename=img_name)
@@ -2374,7 +2374,7 @@ class CustomDataset_video2(Dataset):
                 img_norm_cfg_clips.append(results["img_norm_cfg"])
         else:
             # print(max(0,this_step[-1]-15),this_step[-1])
-            for i in range(max(0,this_step[-1]-10),this_step[-1]):
+            for i in range(max(0,this_step[-1]-11),this_step[-1]):
                 # print('i am in',idx,this_step,i)
                 img_name=imglist[i]
                 img_info=dict(filename=img_name)

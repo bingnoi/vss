@@ -22,7 +22,7 @@ from .hypercorre import hypercorre_topk2
 from .utils.utils import save_cluster_labels
 import time
 from ..builder import build_loss
-from torch.nn import functional as F
+import torch.nn.functional as F
 
 import math
 
@@ -191,6 +191,8 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         assert min(feature_strides) == feature_strides[0]
         self.feature_strides = feature_strides
         self.dim=dim
+        
+        self.num_classes = 124
 
         c1_in_channels, c2_in_channels, c3_in_channels, c4_in_channels = self.in_channels
 
@@ -256,6 +258,29 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
             self.sr1_feat=nn.Conv2d(embedding_dim, embedding_dim, kernel_size=2, stride=2)
 
         self.self_ensemble2=True
+        
+        self.fusion_strategy = "sigmoid-do1"
+        
+        if self.fusion_strategy in ["sigmoid-do1", "sigmoid-do2", "sigmoid-do3", "concat"]:
+
+            dropprob = 0.3 if self.fusion_strategy in ["sigmoid-do1", "concat", "sigmoid-do3"] else 0.0
+            self.dropout1 = nn.Dropout2d(dropprob)
+            self.dropout2 = nn.Dropout2d(dropprob)
+            self.bn1 = nn.BatchNorm2d(dim[3], eps=1e-03)
+            self.bn2 = nn.BatchNorm2d(dim[3], eps=1e-03)
+
+        if self.fusion_strategy != "concat":
+            self.conv_layer_1 = nn.Conv2d(dim[3],  2*dim[3], (3, 3), stride=1, padding=1, bias=True)
+            self.conv_layer_2 = nn.Conv2d(dim[3],  2*dim[3], (3, 3), stride=1, padding=1, bias=True)
+            if self.fusion_strategy == "sigmoid-do3":
+                self.conv_layer_34 = nn.Conv2d(2*dim[3], 2*dim[3], (3, 3), stride=1, padding=1, bias=True)
+            else:
+                self.conv_layer_3 = nn.Conv2d(2*dim[3], 2*dim[3], (3, 3), stride=1, padding=1, bias=True)
+                self.conv_layer_4 = nn.Conv2d(2*dim[3], 2*dim[3], (3, 3), stride=1, padding=1, bias=True)
+
+            self.conv_down_sample1 = nn.Conv2d(2*dim[3], dim[3], (3, 3), stride=1, padding=1, bias=True)
+            self.bn = nn.BatchNorm2d(2*dim[3], eps=1e-03)
+        
     
     def forward(self, mode, *args, **kwargs):
         if mode == 'init_memory':
@@ -266,63 +291,6 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
             return self.forward_features(*args, **kwargs)
         else:
             raise NotImplementedError
-    
-    # def init_memory(self,):
-    #     B,num_clips,cx,hx,wx=query_frame[0].shape
-    #     query_frame_selected = query_frame[0].permute(0,1,3,4,2).reshape(B,num_clips,-1,cx)
-
-    #     query_frame_selected = self.linear1(query_frame_selected)
-    #     memory_feature = self.linear2(self.memory.data.permute(0,1,3,4,2)).reshape(B,num_clips,-1,cx)
-
-    #     # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
-        
-    #     atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
-
-    #     #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-    #     out = torch.matmul(atten,query_frame_selected).reshape(B,num_clips,hx,wx,cx).permute(0,1,4,2,3)
-        
-    #     self.memory.data = out
-    #     query_frame[0] = out
-
-    # def update_memory(self,inputs):
-    #     B,num_clips,cx,hx,wx=query_frame[0].shape
-    #     query_frame_selected = query_frame[0].permute(0,1,3,4,2).reshape(B,num_clips,-1,cx)
-
-    #     query_frame_selected = self.linear1(query_frame_selected)
-    #     memory_feature = self.linear2(self.memory.data.permute(0,1,3,4,2)).reshape(B,num_clips,-1,cx)
-
-    #     # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
-        
-    #     atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
-
-    #     #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-    #     out = torch.matmul(atten,query_frame_selected).reshape(B,num_clips,hx,wx,cx).permute(0,1,4,2,3)
-        
-    #     self.memory.data = out
-    #     query_frame[0] = out
-    
-    
-    def global_matching(self,mk,qk):
-        B, CK, _,_ = mk.shape
-        
-        mk = mk.flatten(start_dim=2)
-        # print('q',qk.shape)
-        qk = qk.flatten(start_dim=3)
-
-        a = mk.pow(2).sum(1).unsqueeze(2)
-        
-        # print(mk.transpose(1, 2).shape,qk.shape)
-        b = 2 * (mk.transpose(1, 2) @ qk)
-        # We don't actually need this, will update paper later
-        # c = qk.pow(2).expand(B, -1, -1).sum(1).unsqueeze(1)
-
-        affinity = (-a+b) / math.sqrt(CK)  # B, NE, HW
-        affinity = softmax_w_top(affinity,top=20)  # B, THW, HW
-
-        return affinity
-    
-    def read_out(self,affinity,mv):
-        return torch.bmm(mv, affinity)
 
     def forward_features(self,feats,inputs, batch_size=None, num_clips=None):
         #每一层特征下做down_sample,按通道cancat,每一次s*c->s*4c
@@ -403,21 +371,21 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         
         # query_c4=query_c4.reshape(batch_size, (num_clips-1), -1, query_c4.shape[-2], query_c4.shape[-1])
         
-        B,num_clips_select,cx,hx,wx=supp_c4.shape
         
-        # store_c4 = supp_c4
+        store_c4 = supp_c4
         # print('c42 ',query_c4.shape)
         
         # if len(feats)>0:
+        #     B,num_clips_select,cx,hx_supp,wx_supp = supp_c4.shape
         #     supp_frame_selected = supp_c4.permute(0,1,3,4,2)
         #     # print('ss ',query_c4[:,i].shape)
-        #     supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx*wx,cx)) #b,-1,cx
+        #     supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx_supp*wx_supp,cx)) #b,-1,cx
             
-        #     # B,cx,hx,wx=feats.shape 
-        #     B,cx=feats.shape 
+        #     B,cx,hx,wx=feats.shape 
+        #     # B,cx=feats.shape 
             
-        #     # memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
-        #     memory_feature = self.linear2(feats)
+        #     memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
+        #     # memory_feature = self.linear2(feats)
             
         #     atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
 
@@ -425,20 +393,50 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         #     # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
         #     # print('ts',torch.matmul(atten,memory_feature).shape)
             
-        #     supp_c4 = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
-            
-        #     # affinity = self.global_matching(feats,supp_c4)
-        #     # readout_mem = self.read_out(affinity.expand(k,-1,-1),feats)
-        #     # print('tes',readout_mem.shape)
-        #     # exit()
-        #     # print('f1 ',supp_c4.shape)
-        #     # supp_c4 = self.refine_block(supp_c4)
-        #     # print('f2 ',supp_c4.shape)
-        #     # exit()
-            
+        #     supp_c4 = torch.matmul(atten,memory_feature).reshape(B,hx_supp,wx_supp,cx).permute(0,3,1,2)
         #     supp_c4 = supp_c4.unsqueeze(1)
             
-        #     # supp_c4 = supp_c4 + store_c4
+            # in_1 = supp_c4
+            # in_2 = store_c4.squeeze(1)
+
+            # in_1 = self.bn1(in_1)
+            # in_1 = self.dropout1(in_1)
+            # in_1 = F.relu(in_1, inplace=False)
+
+            # in_2 = self.bn2(in_2)
+            # in_2 = self.dropout2(in_2)
+            # in_2 = F.relu(in_2, inplace=False)
+
+            # fused_mem = torch.cat([in_1, in_2], dim=1)
+
+            # if self.fusion_strategy != "concat":
+            #     if self.fusion_strategy == "sigmoid-do3":
+            #         att = self.conv_layer_34(fused_mem)
+            #     else:
+            #         att_1 = self.conv_layer_3(fused_mem)
+            #         att_2 = self.conv_layer_4(fused_mem)
+
+            #     out_1 = self.conv_layer_1(in_1)
+                # out_2 = self.conv_layer_2(in_2)
+
+                # if self.fusion_strategy in ["sigmoid", "sigmoid-do1", "sigmoid-do2"]:
+                #     out_1 *= torch.sigmoid(att_1)
+                #     out_2 *= torch.sigmoid(att_2)
+                # elif self.fusion_strategy == "sigmoid-do3":
+                #     out_1 *= torch.sigmoid(att)
+                #     out_2 *= torch.sigmoid(att)
+                # else:
+                #     out_1 *= att_1
+                #     out_2 *= att_2
+
+                # fused_mem = out_1 + out_2
+                # fused_mem = self.conv_down_sample1(fused_mem)
+                # # if not self.nobn:
+                # #     fused_mem = self.bn(fused_mem)
+                # # fused_mem = F.relu(fused_mem, inplace=self.nobn)
+                # supp_c4 = fused_mem.unsqueeze(1)
+                # # print('ss ',supp_c4.shape)
+                # # exit()
         
         
         supp_frame = [supp_c1, supp_c2, supp_c3, supp_c4]
@@ -528,70 +526,8 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
 
         outs=supp_feats
         
-        if len(feats)>0:
-            supp_frame_selected = outs[3].unsqueeze(1).permute(0,1,3,4,2)
-            # print('ss ',query_c4[:,i].shape)
-            supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx*wx,cx)) #b,-1,cx
-            
-            # B,cx,hx,wx=feats.shape 
-            B,cx=feats.shape 
-            
-            # memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
-            memory_feature = self.linear2(feats)
-            
-            atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
-
-            #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-            # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
-            # print('ts',torch.matmul(atten,memory_feature).shape)
-            
-            supp_c4 = torch.matmul(atten,memory_feature).reshape(B,hx,wx,cx).permute(0,3,1,2)
+        # print('s ',[i.shape for i in outs])
         
-        outs[3] = supp_c4 
-           
-            # supp_c4 = supp_c4 + store_c4
-            
-            # in_1 = outs[3]
-            # in_2 = feats
-
-            # # if self.fusion_strategy in ["sigmoid-do1", "sigmoid-do2", "sigmoid-do3", "concat"]:
-
-            # in_1 = self.bn1(in_1)
-            # in_1 = self.dropout1(in_1)
-            # in_1 = F.relu(in_1, inplace=False)
-
-            # in_2 = self.bn2(in_2)
-            # in_2 = self.dropout2(in_2)
-            # in_2 = F.relu(in_2, inplace=False)
-
-            # fused_mem = torch.cat([in_1, in_2], dim=1)
-
-            # if self.fusion_strategy != "concat":
-            #     if self.fusion_strategy == "sigmoid-do3":
-            #         att = self.conv_layer_34(fused_mem)
-            #     else:
-            #         att_1 = self.conv_layer_3(fused_mem)
-            #         att_2 = self.conv_layer_4(fused_mem)
-
-            #     out_1 = self.conv_layer_1(in_1)
-            #     out_2 = self.conv_layer_2(in_2)
-
-            #     if self.fusion_strategy in ["sigmoid", "sigmoid-do1", "sigmoid-do2"]:
-            #         out_1 *= torch.sigmoid(att_1)
-            #         out_2 *= torch.sigmoid(att_2)
-            #     elif self.fusion_strategy == "sigmoid-do3":
-            #         out_1 *= torch.sigmoid(att)
-            #         out_2 *= torch.sigmoid(att)
-            #     else:
-            #         out_1 *= att_1
-            #         out_2 *= att_2
-
-            #     fused_mem = out_1 + out_2
-            #     if not self.nobn:
-            #         fused_mem = self.bn(fused_mem)
-            #     fused_mem = F.relu(fused_mem, inplace=self.nobn)
-        
-
         # ends here !!!!!!
 
         # print('p',c1[:,0].shape,c2[:,0].shape,c3[:,0].shape,c4[:,0].shape)
@@ -636,11 +572,55 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # out3=resize(self.deco3(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         # out4=resize(self.deco4(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         
+        if len(feats)>0:
+            # 算label
+            batch_size, num_channels, h, w = supp_feats.size()
+            # extract the history features
+            # --(B, num_classes, H, W) --> (B*H*W, num_classes)
+            weight_cls = x.reshape(-1, self.num_classes)
+            weight_cls = F.softmax(weight_cls, dim=-1)
+            
+            labels = weight_cls.argmax(-1).reshape(-1, 1)
+            onehot = torch.zeros_like(weight_cls).scatter_(1, labels.long(), 1)
+            weight_cls = onehot
+                
+            #算weight
+            # --(B*H*W, num_classes) * (num_classes, C) --> (B*H*W, C)
+            selected_memory_list = []
+            for idx in range(self.num_feats_per_cls):
+                memory = feats[:, idx, :]
+                selected_memory = torch.matmul(weight_cls, memory)
+                selected_memory_list.append(selected_memory.unsqueeze(1))
+                
+            # calculate selected_memory according to the num_feats_per_cls
+            #融合memory算输出
+            if self.num_feats_per_cls > 1:
+                relation_selected_memory_list = []
+                for idx, selected_memory in enumerate(selected_memory_list):
+                    # --(B*H*W, C) --> (B, H, W, C)
+                    selected_memory = selected_memory.view(batch_size, h, w, num_channels)
+                    # --(B, H, W, C) --> (B, C, H, W)
+                    selected_memory = selected_memory.permute(0, 3, 1, 2).contiguous()
+                    # --append
+                    relation_selected_memory_list.append(self.self_attentions[idx](supp_feats, selected_memory))
+                # --concat
+                selected_memory = torch.cat(relation_selected_memory_list, dim=1)
+                selected_memory = self.fuse_memory_conv(selected_memory)
+            else:
+                assert len(selected_memory_list) == 1
+                selected_memory = selected_memory_list[0].squeeze(1)
+                # --(B*H*W, C) --> (B, H, W, C)
+                selected_memory = selected_memory.view(batch_size, h, w, num_channels)
+                # --(B, H, W, C) --> (B, C, H, W)
+                selected_memory = selected_memory.permute(0, 3, 1, 2).contiguous()
+                # --feed into the self attention module
+                selected_memory = self.self_attention(feats, selected_memory)
+        
         out1=resize(self.deco1(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         out2=resize(self.deco2(outs[1]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         out3=resize(self.deco3(outs[2]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         out4=resize(self.deco4(outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-
+        
         # out3=resize(self.deco3(outs[2]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         # out4=resize(self.deco4(outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         # out4=resize(self.deco4((outs[0]+outs[1]+outs[2])/3.0+outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
