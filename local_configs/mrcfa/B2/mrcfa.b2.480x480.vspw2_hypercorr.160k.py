@@ -10,7 +10,7 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 find_unused_parameters = True
 model = dict(
     type='EncoderDecoder_clips',
-    pretrained='/home/lixinhao/original/mit_b2.pth',
+    pretrained='/datadisk/vspw/mit_b2.pth',
     backbone=dict(
         type='mit_b2',
         style='pytorch'),

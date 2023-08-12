@@ -229,14 +229,15 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         self.linear1 = nn.Linear(dim[3],dim[3],bias=True)
         self.linear2 = nn.Linear(dim[3],dim[3],bias=True)
 
-        self.deco1=small_decoder2(embedding_dim,256, self.num_classes)
-        self.deco2=small_decoder2(embedding_dim,512, self.num_classes)
-        self.deco3=small_decoder2(embedding_dim,512, self.num_classes)
-        self.deco4=small_decoder2(embedding_dim,512, self.num_classes)
-
-        # self.deco2=small_decoder2(embedding_dim,256, self.num_classes)
-        # self.deco3=small_decoder2(embedding_dim,256, self.num_classes)
-        # self.deco4=small_decoder2(embedding_dim,256, self.num_classes)
+        self.deco1=small_decoder2(embedding_dim,256+64, self.num_classes)
+        self.deco2=small_decoder2(embedding_dim,512+64, self.num_classes)
+        self.deco3=small_decoder2(embedding_dim,512+64, self.num_classes)
+        self.deco4=small_decoder2(embedding_dim,512+64, self.num_classes)
+        
+        # self.deco1=small_decoder2(embedding_dim,256, self.num_classes)
+        # self.deco2=small_decoder2(embedding_dim,512, self.num_classes)
+        # self.deco3=small_decoder2(embedding_dim,512, self.num_classes)
+        # self.deco4=small_decoder2(embedding_dim,512, self.num_classes)
 
         self.hypercorre_module=hypercorre_topk2(dim=self.in_channels, backbone=self.backbone)
         
@@ -281,6 +282,7 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
             self.conv_down_sample1 = nn.Conv2d(2*dim[3], dim[3], (3, 3), stride=1, padding=1, bias=True)
             self.bn = nn.BatchNorm2d(2*dim[3], eps=1e-03)
         
+        self.num_feats_per_cls = 1
     
     def forward(self, mode, *args, **kwargs):
         if mode == 'init_memory':
@@ -292,7 +294,7 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         else:
             raise NotImplementedError
 
-    def forward_features(self,feats,inputs, batch_size=None, num_clips=None):
+    def forward_features(self,feats,segmentation,inputs, batch_size=None, num_clips=None):
         #每一层特征下做down_sample,按通道cancat,每一次s*c->s*4c
         # print('a ',len(inputs))
         # print('b ',inputs[0].shape)
@@ -526,6 +528,8 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
 
         outs=supp_feats
         
+        # print("sssqq",[i.shape for i in outs])
+        
         # print('s ',[i.shape for i in outs])
         
         # ends here !!!!!!
@@ -572,50 +576,75 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # out3=resize(self.deco3(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         # out4=resize(self.deco4(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         
+        outs_new=[]
         if len(feats)>0:
             # 算label
-            batch_size, num_channels, h, w = supp_feats.size()
-            # extract the history features
-            # --(B, num_classes, H, W) --> (B*H*W, num_classes)
-            weight_cls = x.reshape(-1, self.num_classes)
-            weight_cls = F.softmax(weight_cls, dim=-1)
-            
-            labels = weight_cls.argmax(-1).reshape(-1, 1)
-            onehot = torch.zeros_like(weight_cls).scatter_(1, labels.long(), 1)
-            weight_cls = onehot
+            for supp_feats_i in supp_feats:
+                batch_size, num_channels, h, w = supp_feats_i.size()
+                # extract the history features
+                # --(B, num_classes, H, W) --> (B*H*W, num_classes)
+                new_x = x[:,-1]
                 
-            #算weight
-            # --(B*H*W, num_classes) * (num_classes, C) --> (B*H*W, C)
-            selected_memory_list = []
-            for idx in range(self.num_feats_per_cls):
-                memory = feats[:, idx, :]
-                selected_memory = torch.matmul(weight_cls, memory)
-                selected_memory_list.append(selected_memory.unsqueeze(1))
+                new_batch_size, new_num_channels, new_h, new_w = new_x.size()
+                # print("x",new_x.shape)
                 
-            # calculate selected_memory according to the num_feats_per_cls
-            #融合memory算输出
-            if self.num_feats_per_cls > 1:
-                relation_selected_memory_list = []
-                for idx, selected_memory in enumerate(selected_memory_list):
+                new_x = new_x.permute(0,2,3,1)
+                weight_cls = new_x.reshape(-1, self.num_classes)
+                weight_cls = F.softmax(weight_cls, dim=-1)
+                
+                # print("sss",weight_cls.shape,feats.shape)
+                
+                labels = weight_cls.argmax(-1).reshape(-1, 1)
+                onehot = torch.zeros_like(weight_cls).scatter_(1, labels.long(), 1)
+                weight_cls = onehot
+                    
+                #算weight
+                # --(B*H*W, num_classes) * (num_classes, C) --> (B*H*W, C)
+                selected_memory_list = []
+                for idx in range(self.num_feats_per_cls):
+                    memory = feats[:, idx, :]
+                    # print("st",weight_cls.shape,memory.shape)
+                    selected_memory = torch.matmul(weight_cls, memory)
+                    selected_memory_list.append(selected_memory.unsqueeze(1))
+                    
+                    
+                # print("sha ",[i.shape for i in selected_memory_list]) 
+                #14400*124 * 124*64
+                
+                # calculate selected_memory according to the num_feats_per_cls
+                #融合memory算输出
+                if self.num_feats_per_cls > 1:
+                    relation_selected_memory_list = []
+                    for idx, selected_memory in enumerate(selected_memory_list):
+                        # --(B*H*W, C) --> (B, H, W, C)
+                        selected_memory = selected_memory.view(batch_size, h, w, num_channels)
+                        # --(B, H, W, C) --> (B, C, H, W)
+                        selected_memory = selected_memory.permute(0, 3, 1, 2).contiguous()
+                        # --append
+                        relation_selected_memory_list.append(self.self_attentions[idx](supp_feats, selected_memory))
+                    # --concat
+                    selected_memory = torch.cat(relation_selected_memory_list, dim=1)
+                    selected_memory = self.fuse_memory_conv(selected_memory)
+                else:
+                    assert len(selected_memory_list) == 1
+                    selected_memory = selected_memory_list[0].squeeze(1)
                     # --(B*H*W, C) --> (B, H, W, C)
-                    selected_memory = selected_memory.view(batch_size, h, w, num_channels)
+                    selected_memory = selected_memory.view(new_batch_size, new_h, new_w, selected_memory.shape[-1])
                     # --(B, H, W, C) --> (B, C, H, W)
                     selected_memory = selected_memory.permute(0, 3, 1, 2).contiguous()
-                    # --append
-                    relation_selected_memory_list.append(self.self_attentions[idx](supp_feats, selected_memory))
-                # --concat
-                selected_memory = torch.cat(relation_selected_memory_list, dim=1)
-                selected_memory = self.fuse_memory_conv(selected_memory)
-            else:
-                assert len(selected_memory_list) == 1
-                selected_memory = selected_memory_list[0].squeeze(1)
-                # --(B*H*W, C) --> (B, H, W, C)
-                selected_memory = selected_memory.view(batch_size, h, w, num_channels)
-                # --(B, H, W, C) --> (B, C, H, W)
-                selected_memory = selected_memory.permute(0, 3, 1, 2).contiguous()
-                # --feed into the self attention module
-                selected_memory = self.self_attention(feats, selected_memory)
+                    # --feed into the self attention module
+                    # selected_memory = self.self_attention(feats, selected_memory)
+                    
+                    # print("ttt",supp_feats_i.shape,selected_memory.shape)
+                    # selected_memory_atten = torch.matmul(supp_feats_i,selected_memory.transpose(-1,-2))
+                    # out_feats = torch.matmul(selected_memory_atten,selected_memory)
+                memory_down_feat = F.interpolate(selected_memory,size=(60,60),mode='bilinear',align_corners=False)
+                # print("sh",out_feats.shape,selected_memory.shape)
+                outs_new.append(torch.cat([supp_feats_i,memory_down_feat],dim=1))
         
+        outs = outs_new
+        
+        _, _, h, w=_c.shape
         out1=resize(self.deco1(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         out2=resize(self.deco2(outs[1]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         out3=resize(self.deco3(outs[2]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
@@ -625,11 +654,11 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # out4=resize(self.deco4(outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         # out4=resize(self.deco4((outs[0]+outs[1]+outs[2])/3.0+outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
 
+        # print("s",x.shape,out1.shape,out2.shape,out3.shape,out4.shape)
         output=torch.cat([x,out1,out2,out3,out4],dim=1)   ## b*(k+k)*124*h*w
         # output=torch.cat([x,out4],dim=1)
 
-        # print("test ok")
-        # a=input()
+        # exit()
 
         if not self.training:
             # return output.squeeze(1)

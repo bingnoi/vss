@@ -24,7 +24,7 @@ from torch.nn import functional as F
 from .segformer_head import *
 from .segformer_clip import *
 
-from .memory import *
+from .memorysav import *
 
 @HEADS.register_module()
 class SegFormerHead_clips(BaseDecodeHead_clips):
@@ -38,7 +38,7 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         self.memory = FeatureMemory()
         
 
-    def forward(self, inputs,batch_size, num_clips,memory):
+    def forward(self, inputs,batch_size, num_clips,gt_semantic_seg,memory):
         #每隔四帧做一次预测，每隔5帧交互生成一次memory_feature
 
         # if self.mode == 'TRAIN':
@@ -112,10 +112,11 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
             for i in range(frame_len):
                 if i == 0 and memory == None:
                     # print("set memory ",i)
-                    memoryFeature = self.memory(mode='init_memory',feats=inputs[-1][:num_infer,:])
+                    memoryFeature = self.memory(mode='init_memory',feats=inputs[0][:num_infer,:],segmentation=gt_semantic_seg[:,:1])
+                    # print("init",memoryFeature.shape)
                 elif ((i+skip_frame)==former_frame or i==0) and memory != None:
-                    memoryFeature = self.memory(mode='set_memory',feats=memory.squeeze(0))
-                    # print('ss1 ',i,memory==None,memoryFeature==None)
+                    memoryFeature = self.memory(mode='set_memory',feats=memory.squeeze(0),segmentation=gt_semantic_seg[:,:1])
+                    # print("set",memoryFeature.shape)
                 if (i+skip_frame)%num_infer==0 and (i+skip_frame)>num_infer and (i+skip_frame)>former_frame:
                     # num_digit = i / 10
                     # num_decimal = i % 10
@@ -123,7 +124,8 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
                     # print('qqqqq ',i,frame_len,int(i/5-1)*5,int((i/5)*5))
                     # print('sss',int((i/num_infer-1)*num_infer),int((i/num_infer)*num_infer))
                     # print("update memory ",i)
-                    memoryFeature = self.memory(mode ='update_memory',feats=inputs[-1][int((i/num_infer-1)*num_infer):int((i/num_infer)*num_infer),:])
+                    memoryFeature = self.memory(mode ='update_memory',feats=inputs[0][int((i/num_infer-1)*num_infer):int((i/num_infer)*num_infer),:],segmentation=gt_semantic_seg[:,:1])
+                    # print("update",memoryFeature.shape)
                 # if memoryFeature != None:
                 #     print(i,memoryFeature.shape)
                 #     print('ss2 ',i,memory.shape)
@@ -133,7 +135,8 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
                     for sh in range(4):
                         frame_in.append(torch.stack([inputs[sh][q,:] for q in range(i-frame_gap_l+1,i+1,frame_gap)],dim=0))
                     # print('shape1',[i.shape for i in frame_in])
-                    out = self.net(mode='segment',feats=memoryFeature,inputs=frame_in,batch_size=1,num_clips=4)
+                    # print("segment",i,memoryFeature.shape)
+                    out = self.net(mode='segment',feats=memoryFeature,inputs=frame_in,batch_size=1,num_clips=4,segmentation=gt_semantic_seg[:,:1])
                     # print('o2 ',out.shape,frame_len)
                     out_to.append(out)
                     # print("predict",i)
@@ -148,6 +151,7 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         #     print('oo',out.shape)
         #     exit()
         # print('memory',memoryFeature.shape)
+        # exit()
         if self.training:
             return out,memoryFeature
         else:

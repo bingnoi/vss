@@ -430,7 +430,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
-        seg_logits,memory = self.forward(inputs,batch_size, num_clips,memory)
+        seg_logits,memory = self.forward(inputs,batch_size, num_clips,gt_semantic_seg,memory)
         losses = self.losses(seg_logits, gt_semantic_seg)
         return losses,memory
 

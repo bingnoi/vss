@@ -10,9 +10,13 @@ import torch.distributed as dist
 class FeatureMemory(nn.Module):
     def __init__(self) -> None:
         super(FeatureMemory,self).__init__()
-        num_classes = 124
-        num_feats_per_cls = 1
-        feats_channels = 512
+        self.num_classes = 124
+        self.num_feats_per_cls = 1
+        self.feats_channels = 64
+        
+        num_classes=self.num_classes 
+        num_feats_per_cls=self.num_feats_per_cls 
+        feats_channels=self.feats_channels 
         
         # self.memory = nn.Parameter(torch.zeros([1,5,512,15,15]), requires_grad = False)
         self.memory = nn.Parameter(torch.zeros(num_classes,num_feats_per_cls,feats_channels,dtype=torch.float), requires_grad = False)
@@ -32,18 +36,25 @@ class FeatureMemory(nn.Module):
         # self.down_linear = nn.Linear(4*512,512)
         
     def set_memory(self,feats):
-        self.memory.data=feats
+        self.memory.data=feats.squeeze(0)
         return self.memory.data
     
     def handle_squeeze(self,feats,segmentation,ignore_index=255):
         pass
         
     def init_memory(self,feats,segmentation,ignore_index=255):
+        feats = feats[:,:1].squeeze(1)
+        
+        feats = F.interpolate(feats,size=(480,480),mode='bilinear',align_corners=False)
+        
         batch_size, num_channels, h, w = feats.size()
         
         segmentation = segmentation.long()
+        
+        #print('shape',segmentation.shape,feats.shape)
         feats = feats.permute(0,2,3,1).contiguous()
         feats = feats.view(batch_size*h*w,num_channels)
+        
         clsids = segmentation.unique()
         for clsid in clsids:
             if clsid == ignore_index : continue
@@ -53,15 +64,21 @@ class FeatureMemory(nn.Module):
             for idx in range(self.num_feats_per_cls):
                 if (self.memory[clsid][idx] == 0).sum() == self.feats_channels:
                     self.memory[clsid][idx].data.copy_(feats_cls.mean(0))
-                    need_update = False
-                    break
+        
+        return self.memory.data
 
     def update_memory_momentum(self,features,segmentation,ignore_index=255, strategy='cosine_similarity', momentum_cfg=None, learning_rate=None):
         assert strategy in ['mean', 'cosine_similarity']
+        features = features[:,:1].squeeze(1)
+        # print('f ',features.shape)
+        
+        features = F.interpolate(features,size=(480,480),mode='bilinear',align_corners=False)
         batch_size, num_channels, h, w = features.size()
-        momentum = momentum_cfg['base_momentum']
-        if momentum_cfg['adjust_by_learning_rate']:
-            momentum = momentum_cfg['base_momentum'] / momentum_cfg['base_lr'] * learning_rate
+        # momentum = momentum_cfg['base_momentum']
+        # if momentum_cfg['adjust_by_learning_rate']:
+        #     momentum = momentum_cfg['base_momentum'] / momentum_cfg['base_lr'] * learning_rate
+        
+        momentum = 0.1
         # use features to update memory
         segmentation = segmentation.long()
         features = features.permute(0, 2, 3, 1).contiguous()
@@ -113,6 +130,8 @@ class FeatureMemory(nn.Module):
             memory = self.memory.data.clone()
             dist.all_reduce(memory.div_(dist.get_world_size()))
             self.memory = nn.Parameter(memory, requires_grad=False)
+            
+        return self.memory.data
 
     def update_memory(self,feats,preds):
         batch_size, num_channels, h, w = feats.size()
