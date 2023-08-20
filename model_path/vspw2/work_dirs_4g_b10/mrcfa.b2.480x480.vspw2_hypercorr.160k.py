@@ -172,7 +172,7 @@ workflow = [('train', 1)]
 cudnn_benchmark = True
 optimizer = dict(
     type='AdamW',
-    lr=5e-06,
+    lr=6e-06,
     betas=(0.9, 0.999),
     weight_decay=0.01,
     paramwise_cfg=dict(
@@ -192,5 +192,5 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=160000)
 checkpoint_config = dict(by_epoch=False, interval=4000)
 evaluation = dict(interval=160000, metric='mIoU')
-work_dir = 'model_path/vspw2/work_dirs_4g_b5'
+work_dir = 'model_path/vspw2/work_dirs_4g_b10/'
 gpu_ids = range(0, 1)

@@ -2374,7 +2374,7 @@ class CustomDataset_video2(Dataset):
                 img_norm_cfg_clips.append(results["img_norm_cfg"])
         else:
             # print(max(0,this_step[-1]-15),this_step[-1])
-            for i in range(max(0,this_step[-1]-11),this_step[-1]):
+            for i in range(max(0,this_step[-1]-13),this_step[-1]):
                 # print('i am in',idx,this_step,i)
                 img_name=imglist[i]
                 img_info=dict(filename=img_name)

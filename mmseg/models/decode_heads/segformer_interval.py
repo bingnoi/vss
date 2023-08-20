@@ -24,7 +24,7 @@ from torch.nn import functional as F
 from .segformer_head import *
 from .segformer_clip import *
 
-from .memorysav import *
+from .memory import *
 
 @HEADS.register_module()
 class SegFormerHead_clips(BaseDecodeHead_clips):
@@ -42,7 +42,7 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         #每隔四帧做一次预测，每隔5帧交互生成一次memory_feature
 
         # if self.mode == 'TRAIN':
-        # print('1len ',len(inputs))
+        # print('1len ',len(inputs[0]))
         
         num_infer = self.num_infer
         
@@ -98,20 +98,18 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
             skip_frame = 2 #总长度-1-单次跑的帧
             former_frame = 8 #单次跑的帧-1
         # 第一是可能出现overlap,第二是可能出现0-5帧的重复更新特征
+        if not self.training:
+            gt_semantic_seg = torch.empty(2,2)
         if frame_len < frame_gap_l:
-            memoryFeature = []
-            out = self.net(mode='segment',feats=memoryFeature,inputs=inputs,batch_size=1,num_clips=frame_len)
-            # print('out1',out.shape)
-            # if self.training:
-            #     out_to.append(out)
-            
-            # print('o1 ',out.shape,frame_len)
-            return out
-            # exit()
+            if self.training:
+                memoryFeature = []
+            else:
+                memoryFeature = self.memory.memory.data
+            out = self.net(mode='segment',feats=memoryFeature,inputs=inputs,batch_size=1,num_clips=frame_len,segmentation=gt_semantic_seg)
+            return out,memoryFeature
         else:
             for i in range(frame_len):
                 if i == 0 and memory == None:
-                    # print("set memory ",i)
                     memoryFeature = self.memory(mode='init_memory',feats=inputs[0][:num_infer,:],segmentation=gt_semantic_seg[:,:1])
                     # print("init",memoryFeature.shape)
                 elif ((i+skip_frame)==former_frame or i==0) and memory != None:
@@ -139,20 +137,9 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
                     out = self.net(mode='segment',feats=memoryFeature,inputs=frame_in,batch_size=1,num_clips=4,segmentation=gt_semantic_seg[:,:1])
                     # print('o2 ',out.shape,frame_len)
                     out_to.append(out)
-                    # print("predict",i)
-            # exit()   
-            # print('ot',len(out_to))
-            
         
         if not self.training:
             out_to = [out_to[-1]]
         out = torch.cat(out_to,dim=1)
-        # if type(out_to) != 'tensor':
-        #     print('oo',out.shape)
-        #     exit()
-        # print('memory',memoryFeature.shape)
-        # exit()
-        if self.training:
-            return out,memoryFeature
-        else:
-            return out
+        
+        return out,memoryFeature

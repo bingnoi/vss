@@ -226,8 +226,13 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
 
         # self.linear_pred2 = nn.Conv2d(embedding_dim, self.num_classes, kernel_size=1)
         
-        self.linear1 = nn.Linear(dim[3],dim[3],bias=True)
-        self.linear2 = nn.Linear(dim[3],dim[3],bias=True)
+        self.linear1 = nn.Linear(dim[0],dim[0],bias=True)
+        self.linear2 = nn.Linear(dim[0],dim[0],bias=True)
+
+        self.sdeco1=small_decoder2(embedding_dim,256, self.num_classes)
+        self.sdeco2=small_decoder2(embedding_dim,512, self.num_classes)
+        self.sdeco3=small_decoder2(embedding_dim,512, self.num_classes)
+        self.sdeco4=small_decoder2(embedding_dim,512, self.num_classes)
 
         self.deco1=small_decoder2(embedding_dim,256+64, self.num_classes)
         self.deco2=small_decoder2(embedding_dim,512+64, self.num_classes)
@@ -356,6 +361,7 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         query_c1, query_c2, query_c3, query_c4=c1[:,:-1], c2[:,:-1], c3[:,:-1], c4[:,:-1]
         query_frame=[query_c1, query_c2, query_c3, query_c4]
         
+        
         supp_frame=[c1[:,-1:], c2[:,-1:], c3[:,-1:], c4[:,-1:]]
         supp_c1,supp_c2,supp_c3,supp_c4 = supp_frame[0],supp_frame[1],supp_frame[2],supp_frame[3] 
         
@@ -374,71 +380,25 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # query_c4=query_c4.reshape(batch_size, (num_clips-1), -1, query_c4.shape[-2], query_c4.shape[-1])
         
         
-        store_c4 = supp_c4
-        # print('c42 ',query_c4.shape)
-        
-        # if len(feats)>0:
-        #     B,num_clips_select,cx,hx_supp,wx_supp = supp_c4.shape
-        #     supp_frame_selected = supp_c4.permute(0,1,3,4,2)
-        #     # print('ss ',query_c4[:,i].shape)
-        #     supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx_supp*wx_supp,cx)) #b,-1,cx
+        if len(feats)>0:
+            B,num_clips_select,cx,hx_supp,wx_supp = supp_c1.shape
+            supp_frame_selected = supp_c1.permute(0,1,3,4,2)
+            supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx_supp*wx_supp,cx)) #b,-1,cx
             
-        #     B,cx,hx,wx=feats.shape 
-        #     # B,cx=feats.shape 
+            B,cx,hx,wx=feats.shape 
+            # B,cx=feats.shape 
             
-        #     memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
-        #     # memory_feature = self.linear2(feats)
+            memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
+            # memory_feature = self.linear2(feats)
             
-        #     atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
+            atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
 
-        #     #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-        #     # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
-        #     # print('ts',torch.matmul(atten,memory_feature).shape)
+            #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
+            # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
+            # print('ts',torch.matmul(atten,memory_feature).shape)
             
-        #     supp_c4 = torch.matmul(atten,memory_feature).reshape(B,hx_supp,wx_supp,cx).permute(0,3,1,2)
-        #     supp_c4 = supp_c4.unsqueeze(1)
-            
-            # in_1 = supp_c4
-            # in_2 = store_c4.squeeze(1)
-
-            # in_1 = self.bn1(in_1)
-            # in_1 = self.dropout1(in_1)
-            # in_1 = F.relu(in_1, inplace=False)
-
-            # in_2 = self.bn2(in_2)
-            # in_2 = self.dropout2(in_2)
-            # in_2 = F.relu(in_2, inplace=False)
-
-            # fused_mem = torch.cat([in_1, in_2], dim=1)
-
-            # if self.fusion_strategy != "concat":
-            #     if self.fusion_strategy == "sigmoid-do3":
-            #         att = self.conv_layer_34(fused_mem)
-            #     else:
-            #         att_1 = self.conv_layer_3(fused_mem)
-            #         att_2 = self.conv_layer_4(fused_mem)
-
-            #     out_1 = self.conv_layer_1(in_1)
-                # out_2 = self.conv_layer_2(in_2)
-
-                # if self.fusion_strategy in ["sigmoid", "sigmoid-do1", "sigmoid-do2"]:
-                #     out_1 *= torch.sigmoid(att_1)
-                #     out_2 *= torch.sigmoid(att_2)
-                # elif self.fusion_strategy == "sigmoid-do3":
-                #     out_1 *= torch.sigmoid(att)
-                #     out_2 *= torch.sigmoid(att)
-                # else:
-                #     out_1 *= att_1
-                #     out_2 *= att_2
-
-                # fused_mem = out_1 + out_2
-                # fused_mem = self.conv_down_sample1(fused_mem)
-                # # if not self.nobn:
-                # #     fused_mem = self.bn(fused_mem)
-                # # fused_mem = F.relu(fused_mem, inplace=self.nobn)
-                # supp_c4 = fused_mem.unsqueeze(1)
-                # # print('ss ',supp_c4.shape)
-                # # exit()
+            supp_c1 = torch.matmul(atten,memory_feature).reshape(B,hx_supp,wx_supp,cx).permute(0,3,1,2)
+            supp_c1 = supp_c1.unsqueeze(1)
         
         
         supp_frame = [supp_c1, supp_c2, supp_c3, supp_c4]
@@ -571,94 +531,95 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # print([i.shape for i in outs])
         # [torch.Size([1, 256, 225]), torch.Size([1, 256, 225]), torch.Size([1, 256, 225])]
         
-        # out1=resize(self.deco1(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-        # out2=resize(self.deco2(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-        # out3=resize(self.deco3(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-        # out4=resize(self.deco4(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        out1=resize(self.sdeco1(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        out2=resize(self.sdeco2(outs[1]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        out3=resize(self.sdeco3(outs[2]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        out4=resize(self.sdeco4(outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         
-        outs_new=[]
-        if len(feats)>0:
-            # 算label
-            for supp_feats_i in supp_feats:
-                batch_size, num_channels, h, w = supp_feats_i.size()
-                # extract the history features
-                # --(B, num_classes, H, W) --> (B*H*W, num_classes)
-                new_x = x[:,-1]
+        # outs_new=[]
+        # if len(feats)>0:
+        #     # 算label
+        #     for supp_feats_i in supp_feats:
+        #         batch_size, num_channels, h, w = supp_feats_i.size()
+        #         # print("s",batch_size, num_channels, h, w)
+        #         # extract the history features
+        #         # --(B, num_classes, H, W) --> (B*H*W, num_classes)
+        #         new_x = x[:,-1]
                 
-                new_batch_size, new_num_channels, new_h, new_w = new_x.size()
-                # print("x",new_x.shape)
+        #         new_batch_size, new_num_channels, new_h, new_w = new_x.size()
                 
-                new_x = new_x.permute(0,2,3,1)
-                weight_cls = new_x.reshape(-1, self.num_classes)
-                weight_cls = F.softmax(weight_cls, dim=-1)
+        #         new_x = new_x.permute(0,2,3,1)
+        #         weight_cls = new_x.reshape(-1, self.num_classes)
+        #         weight_cls = F.softmax(weight_cls, dim=-1)
                 
-                # print("sss",weight_cls.shape,feats.shape)
+        #         # print("sss",weight_cls.shape,feats.shape)
                 
-                labels = weight_cls.argmax(-1).reshape(-1, 1)
-                onehot = torch.zeros_like(weight_cls).scatter_(1, labels.long(), 1)
-                weight_cls = onehot
+        #         labels = weight_cls.argmax(-1).reshape(-1, 1)
+        #         onehot = torch.zeros_like(weight_cls).scatter_(1, labels.long(), 1)
+        #         weight_cls = onehot
                     
-                #算weight
-                # --(B*H*W, num_classes) * (num_classes, C) --> (B*H*W, C)
-                selected_memory_list = []
-                for idx in range(self.num_feats_per_cls):
-                    memory = feats[:, idx, :]
-                    # print("st",weight_cls.shape,memory.shape)
-                    selected_memory = torch.matmul(weight_cls, memory)
-                    selected_memory_list.append(selected_memory.unsqueeze(1))
+        #         #算weight
+        #         # --(B*H*W, num_classes) * (num_classes, C) --> (B*H*W, C)
+        #         selected_memory_list = []
+        #         for idx in range(self.num_feats_per_cls):
+        #             memory = feats[:, idx, :]
+        #             # print("st",weight_cls.shape,memory.shape)
+        #             selected_memory = torch.matmul(weight_cls, memory)
+        #             selected_memory_list.append(selected_memory.unsqueeze(1))
                     
                     
-                # print("sha ",[i.shape for i in selected_memory_list]) 
-                #14400*124 * 124*64
+        #         # print("sha ",[i.shape for i in selected_memory_list]) 
+        #         #14400*124 * 124*64
                 
-                # calculate selected_memory according to the num_feats_per_cls
-                #融合memory算输出
-                if self.num_feats_per_cls > 1:
-                    relation_selected_memory_list = []
-                    for idx, selected_memory in enumerate(selected_memory_list):
-                        # --(B*H*W, C) --> (B, H, W, C)
-                        selected_memory = selected_memory.view(batch_size, h, w, num_channels)
-                        # --(B, H, W, C) --> (B, C, H, W)
-                        selected_memory = selected_memory.permute(0, 3, 1, 2).contiguous()
-                        # --append
-                        relation_selected_memory_list.append(self.self_attentions[idx](supp_feats, selected_memory))
-                    # --concat
-                    selected_memory = torch.cat(relation_selected_memory_list, dim=1)
-                    selected_memory = self.fuse_memory_conv(selected_memory)
-                else:
-                    assert len(selected_memory_list) == 1
-                    selected_memory = selected_memory_list[0].squeeze(1)
-                    # --(B*H*W, C) --> (B, H, W, C)
-                    selected_memory = selected_memory.view(new_batch_size, new_h, new_w, selected_memory.shape[-1])
-                    # --(B, H, W, C) --> (B, C, H, W)
-                    selected_memory = selected_memory.permute(0, 3, 1, 2).contiguous()
-                    # --feed into the self attention module
-                    # selected_memory = self.self_attention(feats, selected_memory)
+        #         # calculate selected_memory according to the num_feats_per_cls
+        #         #融合memory算输出
+        #         if self.num_feats_per_cls > 1:
+        #             relation_selected_memory_list = []
+        #             for idx, selected_memory in enumerate(selected_memory_list):
+        #                 # --(B*H*W, C) --> (B, H, W, C)
+        #                 selected_memory = selected_memory.view(batch_size, h, w, num_channels)
+        #                 # --(B, H, W, C) --> (B, C, H, W)
+        #                 selected_memory = selected_memory.permute(0, 3, 1, 2).contiguous()
+        #                 # --append
+        #                 relation_selected_memory_list.append(self.self_attentions[idx](supp_feats, selected_memory))
+        #             # --concat
+        #             selected_memory = torch.cat(relation_selected_memory_list, dim=1)
+        #             selected_memory = self.fuse_memory_conv(selected_memory)
+        #         else:
+        #             assert len(selected_memory_list) == 1
+        #             selected_memory = selected_memory_list[0].squeeze(1)
+        #             # --(B*H*W, C) --> (B, H, W, C)
+        #             selected_memory = selected_memory.view(new_batch_size, new_h, new_w, selected_memory.shape[-1])
+        #             # --(B, H, W, C) --> (B, C, H, W)
+        #             selected_memory = selected_memory.permute(0, 3, 1, 2).contiguous()
+        #             # --feed into the self attention module
+        #             # selected_memory = self.self_attention(feats, selected_memory)
                     
-                    # print("ttt",supp_feats_i.shape,selected_memory.shape)
-                    # selected_memory_atten = torch.matmul(supp_feats_i,selected_memory.transpose(-1,-2))
-                    # out_feats = torch.matmul(selected_memory_atten,selected_memory)
-                memory_down_feat = F.interpolate(selected_memory,size=(60,60),mode='bilinear',align_corners=False)
-                # print("sh",out_feats.shape,selected_memory.shape)
-                outs_new.append(torch.cat([supp_feats_i,memory_down_feat],dim=1))
+        #             # print("ttt",supp_feats_i.shape,selected_memory.shape)
+        #             # selected_memory_atten = torch.matmul(supp_feats_i,selected_memory.transpose(-1,-2))
+        #             # out_feats = torch.matmul(selected_memory_atten,selected_memory)
+        #         memory_down_feat = F.interpolate(selected_memory,size=(h,w),mode='bilinear',align_corners=False)
+        #         # print("sh",out_feats.shape,selected_memory.shape)
+        #         # print("shape ",supp_feats_i.shape,memory_down_feat.shape)
+        #         outs_new.append(torch.cat([supp_feats_i,memory_down_feat],dim=1))
         
-        outs = outs_new
+        #     outs = outs_new
         
-        _, _, h, w=_c.shape
-        out1=resize(self.deco1(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-        out2=resize(self.deco2(outs[1]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-        out3=resize(self.deco3(outs[2]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-        out4=resize(self.deco4(outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        #     _, _, h, w=_c.shape
+        #     out1=resize(self.deco1(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        #     out2=resize(self.deco2(outs[1]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        #     out3=resize(self.deco3(outs[2]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        #     out4=resize(self.deco4(outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
         
-        # out3=resize(self.deco3(outs[2]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-        # out4=resize(self.deco4(outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-        # out4=resize(self.deco4((outs[0]+outs[1]+outs[2])/3.0+outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
-
-        # print("s",x.shape,out1.shape,out2.shape,out3.shape,out4.shape)
+        # else:
+        #     out1=resize(self.sdeco1(outs[0]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        #     out2=resize(self.sdeco2(outs[1]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        #     out3=resize(self.sdeco3(outs[2]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        #     out4=resize(self.sdeco4(outs[3]), size=(h, w),mode='bilinear',align_corners=False).unsqueeze(1)
+        
         output=torch.cat([x,out1,out2,out3,out4],dim=1)   ## b*(k+k)*124*h*w
         # output=torch.cat([x,out4],dim=1)
 
-        # exit()
 
         if not self.training:
             # return output.squeeze(1)

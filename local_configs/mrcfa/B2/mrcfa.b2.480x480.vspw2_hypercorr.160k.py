@@ -10,7 +10,7 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 find_unused_parameters = True
 model = dict(
     type='EncoderDecoder_clips',
-    pretrained='/datadisk/vspw/mit_b2.pth',
+    pretrained='/home/lixinhao/original/mit_b2.pth',
     backbone=dict(
         type='mit_b2',
         style='pytorch'),
@@ -37,7 +37,7 @@ model = dict(
     test_cfg=dict(mode='whole'))
 
 # optimizer
-optimizer = dict(_delete_=True, type='AdamW', lr=0.000009 , betas=(0.9, 0.999), weight_decay=0.01,
+optimizer = dict(_delete_=True, type='AdamW', lr=0.000006 , betas=(0.9, 0.999), weight_decay=0.01,
                  paramwise_cfg=dict(custom_keys={'pos_block': dict(decay_mult=0.),
                                                  'norm': dict(decay_mult=0.),
                                                  'head': dict(lr_mult=10.)
@@ -50,6 +50,6 @@ lr_config = dict(_delete_=True, policy='poly',
                 #  warmup_ratio=1e-8,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-data = dict(samples_per_gpu=1)
+data = dict(samples_per_gpu=1,workers_per_gpu=4)
 # evaluation = dict(interval=4000, metric='mIoU')
 evaluation = dict(interval=160000, metric='mIoU')
