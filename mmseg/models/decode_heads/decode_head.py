@@ -434,7 +434,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         losses = self.losses(seg_logits, gt_semantic_seg)
         return losses,memory
 
-    def forward_test(self, inputs, img_metas, test_cfg, batch_size=None, num_clips=None,memory=None):
+    def forward_test(self, inputs, img_metas, test_cfg, batch_size=None, num_clips=None):
         """Forward function for testing.
 
         Args:
@@ -449,9 +449,10 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         Returns:
             Tensor: Output segmentation map.
         """
+        memory=None
+        gt = None
         # print('clip',num_clips)
-        gt_semantic_seg = None
-        return self.forward(inputs, batch_size, num_clips,gt_semantic_seg,memory)
+        return self.forward(inputs, batch_size, num_clips,gt,memory)
 
     def cls_seg(self, feat):
         """Classify each pixel."""
@@ -731,5 +732,3 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         # print('yes')
         # print(loss['loss_seg'].shape,loss['acc_seg'].shape)
         return loss
-
-

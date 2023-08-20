@@ -166,7 +166,7 @@ def multi_gpu_test(model,
         #     with torch.no_grad():
         #         result,memory = model(memory,return_loss=False, rescale=True, **data)
         with torch.no_grad():
-            result,memory = model(memory,return_loss=False, rescale=True, **data)
+            result = model(memory,return_loss=False, rescale=True, **data)
 
 
         if isinstance(result, list):
@@ -177,9 +177,6 @@ def multi_gpu_test(model,
             if efficient_test:
                 result = np2tmp(result)
             results.append(result)
-        
-        print('devices',len(result))
-        exit()
 
         if rank == 0:
             # batch_size = data['img'][0].size(0)
