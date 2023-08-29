@@ -93,8 +93,9 @@ def inference_segmentor(model, img):
         data['img_metas'] = [i.data[0] for i in data['img_metas']]
 
     # forward the model
+    memory = None
     with torch.no_grad():
-        result = model(return_loss=False, rescale=True, **data)
+        result = model(memory,return_loss=False, rescale=True, **data)
     return result
 
 
@@ -116,6 +117,6 @@ def show_result_pyplot(model, img, result, palette=None, fig_size=(15, 10)):
     img = model.show_result(img, result, palette=palette, show=False)
     plt.figure(figsize=fig_size)
     plt.imshow(mmcv.bgr2rgb(img))
-    plt.show()
-    plt.savefig(img_file.replace('.jpg','')+"_result.png")
+    # plt.show()
+    plt.savefig("./"+"1_result.png")
 

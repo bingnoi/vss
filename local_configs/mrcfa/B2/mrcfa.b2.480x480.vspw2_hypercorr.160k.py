@@ -50,6 +50,6 @@ lr_config = dict(_delete_=True, policy='poly',
                 #  warmup_ratio=1e-8,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-data = dict(samples_per_gpu=1,workers_per_gpu=4)
+data = dict(samples_per_gpu=1,workers_per_gpu=0)
 # evaluation = dict(interval=4000, metric='mIoU')
 evaluation = dict(interval=160000, metric='mIoU')

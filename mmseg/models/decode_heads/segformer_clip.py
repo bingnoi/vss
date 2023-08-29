@@ -179,6 +179,297 @@ def softmax_w_top(x, top=20):
 
     return x
 
+def label_to_onehot(gt, num_classes, ignore_index=255):
+    '''
+    gt: ground truth with size (N, H, W)
+    num_classes: the number of classes of different label
+    '''
+    N, H, W = gt.size()
+    x = gt
+    x[x == ignore_index] = num_classes
+    # convert label into onehot format
+    onehot = torch.zeros(N, x.size(1), x.size(2), num_classes + 1).cuda()
+    onehot = onehot.scatter_(-1, x.unsqueeze(-1), 1)          
+
+    return onehot.permute(0, 3, 1, 2)
+
+class _ObjectAttentionBlock(nn.Module):
+    '''
+    The basic implementation for object context block
+    Input:
+        N X C X H X W
+    Parameters:
+        in_channels       : the dimension of the input feature map
+        key_channels      : the dimension after the key/query transform
+        scale             : choose the scale to downsample the input feature maps (save memory cost)
+        use_gt            : whether use the ground truth label map to compute the similarity map
+        fetch_attention   : whether return the estimated similarity map
+        bn_type           : specify the bn type
+    Return:
+        N X C X H X W
+    '''
+    def __init__(self, 
+                 in_channels, 
+                 key_channels, 
+                 scale=1, 
+                 use_gt=False,
+                 use_bg=False,
+                 fetch_attention=False
+                 ):
+        super(_ObjectAttentionBlock, self).__init__()
+        self.scale = scale
+        self.in_channels = in_channels
+        self.key_channels = key_channels
+        self.use_gt = use_gt
+        self.use_bg = use_bg
+        self.fetch_attention = fetch_attention
+        self.pool = nn.MaxPool2d(kernel_size=(scale, scale))
+        self.f_pixel = nn.Sequential(
+            nn.Conv2d(in_channels=self.in_channels, out_channels=self.key_channels,
+                kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(self.key_channels),
+            nn.ReLU(inplace=True),
+   
+            #ModuleHelper.BNReLU(self.key_channels, bn_type=bn_type),
+            nn.Conv2d(in_channels=self.key_channels, out_channels=self.key_channels,
+                kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(self.key_channels),
+            nn.ReLU(inplace=True),
+#            ModuleHelper.BNReLU(self.key_channels, bn_type=bn_type),
+        )
+        self.f_object = nn.Sequential(
+            nn.Conv2d(in_channels=self.in_channels, out_channels=self.key_channels,
+                kernel_size=1, stride=1, padding=0),
+#            ModuleHelper.BNReLU(self.key_channels, bn_type=bn_type),
+            nn.BatchNorm2d(self.key_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=self.key_channels, out_channels=self.key_channels,
+                kernel_size=1, stride=1, padding=0),
+#            ModuleHelper.BNReLU(self.key_channels, bn_type=bn_type),
+            nn.BatchNorm2d(self.key_channels),
+            nn.ReLU(inplace=True),
+        )
+        self.f_down = nn.Sequential(
+            nn.Conv2d(in_channels=self.in_channels, out_channels=self.key_channels,
+                kernel_size=1, stride=1, padding=0),
+#            ModuleHelper.BNReLU(self.key_channels, bn_type=bn_type),
+            nn.BatchNorm2d(self.key_channels),
+            nn.ReLU(inplace=True),
+        )
+        self.f_up = nn.Sequential(
+            nn.Conv2d(in_channels=self.key_channels, out_channels=self.in_channels,
+                kernel_size=1, stride=1, padding=0),
+#            ModuleHelper.BNReLU(self.in_channels, bn_type=bn_type),
+            nn.BatchNorm2d(self.in_channels),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x, proxy, gt_label=None):
+        batch_size, h, w = x.size(0), x.size(2), x.size(3)
+        b_p,c,k,_ = proxy.shape
+        if self.scale > 1:
+            x = self.pool(x)
+
+        query = self.f_pixel(x).view(batch_size, self.key_channels, -1)
+        query = query.permute(0, 2, 1)
+        key = self.f_object(proxy).view(b_p, self.key_channels, -1)
+        value = self.f_down(proxy).view(b_p, self.key_channels, -1)
+        value = value.permute(0, 2, 1)
+
+        if self.use_gt and gt_label is not None:
+            gt_label = label_to_onehot(gt_label.squeeze(1).type(torch.cuda.LongTensor), proxy.size(2)-1)
+            sim_map = gt_label[:, :, :, :].permute(0, 2, 3, 1).view(batch_size, h*w, -1)
+            if self.use_bg:
+                bg_sim_map = 1.0 - sim_map
+                bg_sim_map = F.normalize(bg_sim_map, p=1, dim=-1)
+            sim_map = F.normalize(sim_map, p=1, dim=-1)
+        else:
+            sim_map = torch.matmul(query, key)
+            sim_map = (self.key_channels**-.5) * sim_map
+            sim_map = F.softmax(sim_map, dim=-1)   
+
+        # add bg context ...
+        context = torch.matmul(sim_map, value) # hw x k x k x c
+        context = context.permute(0, 2, 1).contiguous()
+        context = context.view(batch_size, self.key_channels, *x.size()[2:])
+        context = self.f_up(context)
+        if self.scale > 1:
+            context = F.interpolate(input=context, size=(h, w), mode='bilinear', align_corners=False)
+
+        if self.use_bg:
+            bg_context = torch.matmul(bg_sim_map, value)
+            bg_context = bg_context.permute(0, 2, 1).contiguous()
+            bg_context = bg_context.view(batch_size, self.key_channels, *x.size()[2:])
+            bg_context = self.f_up(bg_context)
+            bg_context = F.interpolate(input=bg_context, size=(h, w), mode='bilinear', align_corners=False)
+            return context, bg_context
+        else:
+            if self.fetch_attention:
+                return context, sim_map
+            else:
+                return context
+
+
+class ObjectAttentionBlock2D(_ObjectAttentionBlock):
+    def __init__(self, 
+                 in_channels, 
+                 key_channels, 
+                 scale=1, 
+                 use_gt=False, 
+                 use_bg=False,
+                 fetch_attention=False
+                 ):
+        super(ObjectAttentionBlock2D, self).__init__(in_channels,
+                                                     key_channels,
+                                                     scale, 
+                                                     use_gt,
+                                                     use_bg,
+                                                     fetch_attention
+                                                     )
+
+class SpatialOCR_Module(nn.Module):
+    """
+    Implementation of the OCR module:
+    We aggregate the global object representation to update the representation for each pixel.
+
+    use_gt=True: whether use the ground-truth label to compute the ideal object contextual representations.
+    use_bg=True: use the ground-truth label to compute the ideal background context to augment the representations.
+    use_oc=True: use object context or not.
+    """
+    def __init__(self, 
+                 in_channels, 
+                 key_channels, 
+                 out_channels, 
+                 scale=1, 
+                 dropout=0.1, 
+                 use_gt=False,
+                 use_bg=False,
+                 use_oc=True,
+                 fetch_attention=False
+                 ):
+        super(SpatialOCR_Module, self).__init__()
+        self.use_gt = use_gt
+        self.use_bg = use_bg
+        self.use_oc = use_oc
+        self.fetch_attention = fetch_attention
+        self.object_context_block = ObjectAttentionBlock2D(in_channels, 
+                                                           key_channels, 
+                                                           scale, 
+                                                           use_gt,
+                                                           use_bg,
+                                                           fetch_attention
+                                                           )
+        if self.use_bg:
+            if self.use_oc:
+                _in_channels = 3 * in_channels
+            else:
+                _in_channels = 2 * in_channels
+        else:
+            _in_channels = 2 * in_channels
+
+        self.conv_bn_dropout = nn.Sequential(
+            nn.Conv2d(_in_channels, out_channels, kernel_size=1, padding=0),
+            #ModuleHelper.BNReLU(out_channels, bn_type=bn_type),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(dropout)
+        )
+
+    def forward(self, feats, proxy_feats, gt_label=None):
+        if self.use_gt and gt_label is not None:
+            if self.use_bg:
+                context, bg_context = self.object_context_block(feats, proxy_feats, gt_label)
+            else:
+                context = self.object_context_block(feats, proxy_feats, gt_label)
+        else:
+            if self.fetch_attention:
+                context, sim_map = self.object_context_block(feats, proxy_feats)
+            else:
+                context = self.object_context_block(feats, proxy_feats)
+
+        if self.use_bg:
+            if self.use_oc:
+                output = self.conv_bn_dropout(torch.cat([context, bg_context, feats], 1))
+            else:
+                output = self.conv_bn_dropout(torch.cat([bg_context, feats], 1))
+        else:
+            output = self.conv_bn_dropout(torch.cat([context, feats], 1))
+
+        if self.fetch_attention:
+            return output, sim_map
+        else:
+            return output
+
+class SpatialTemporalGather_Module(nn.Module):
+    """
+        Aggregate the context features according to the initial predicted probability distribution.
+        Employ the soft-weighted method to aggregate the context.
+    """
+    def __init__(self, cls_num=0, scale=1, use_gt=False):
+        super(SpatialTemporalGather_Module, self).__init__()
+        self.cls_num = cls_num
+        self.scale = scale
+        self.use_gt = use_gt
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, feats, probs,clip_num ,memory=None,memory_num=None):
+#        if self.use_gt and gt_probs is not None:
+#            gt_probs = label_to_onehot(gt_probs.squeeze(1).type(torch.cuda.LongTensor), probs.size(1))
+#            batch_size, c, h, w = gt_probs.size(0), gt_probs.size(1), gt_probs.size(2), gt_probs.size(3)
+#            gt_probs = gt_probs.view(batch_size, c, -1)
+#            feats = feats.view(batch_size, feats.size(1), -1)
+#            feats = feats.permute(0, 2, 1) # batch x hw x c 
+#            gt_probs = F.normalize(gt_probs, p=1, dim=2)# batch x k x hw
+#            ocr_context = torch.matmul(gt_probs, feats).permute(0, 2, 1).unsqueeze(3)# batch x k x c
+#            return ocr_context               
+        
+        assert(probs.size(0)==feats.size(0))
+        # print(feats.shape,probs.shape)
+        # if not self.training:
+        #     probs = resize(probs, size=(120,120),mode='bilinear',align_corners=False)
+        probs_s = torch.split(probs,split_size_or_sections=int(probs.size(0)/(clip_num+1)), dim=0)
+        feats_s = torch.split(feats,split_size_or_sections=int(feats.size(0)/(clip_num+1)), dim=0)
+        if memory is None:
+            contexts=[]
+    
+            for probs,feats in zip(probs_s,feats_s):
+                batch_size, c, h, w = probs.size(0), probs.size(1), probs.size(2), probs.size(3)
+                probs = probs.view(batch_size, c, -1)
+                feats = feats.view(batch_size, feats.size(1), -1)
+                feats = feats.permute(0, 2, 1) # batch x hw x c 
+                probs = F.softmax(self.scale * probs, dim=2)# batch x k x hw
+                ocr_context = torch.matmul(probs, feats).permute(0, 2, 1).unsqueeze(3)# batch x k x c
+                # print('none',feats.shape,probs.shape)
+                contexts.append(ocr_context.unsqueeze(0))
+            
+            contexts = torch.cat(contexts,dim=0)
+            
+            #contexts,_ = torch.max(contexts,dim=0)
+            contexts = torch.mean(contexts,dim=0)
+        else:
+            # if len(memory)>0:
+            #     memory= [m.detach() for m in memory]
+            for probs,feats in zip(probs_s,feats_s):
+                batch_size, c, h, w = probs.size(0), probs.size(1), probs.size(2), probs.size(3)
+                probs = probs.view(batch_size, c, -1)
+                feats = feats.view(batch_size, feats.size(1), -1)
+                feats = feats.permute(0, 2, 1) # batch x hw x c 
+                probs = F.softmax(self.scale * probs, dim=2)# batch x k x hw
+                # print(feats.shape,probs.shape)
+                ocr_context = torch.matmul(probs, feats).permute(0, 2, 1).unsqueeze(3)# batch x k x c
+                
+                # print(len(memory),memory_num,id(memory))
+                while len(memory)>memory_num:
+                    memory.pop(0)
+                memory.append(ocr_context.unsqueeze(0))
+            contexts = torch.cat(memory,dim=0)
+#            contexts,_ = torch.max(contexts,dim=0)
+            contexts = torch.mean(contexts,dim=0)
+        
+        # print("ss",contexts.shape)
+        
+        return contexts
+
 @HEADS.register_module()
 class SegFormerHead_clipsNet(BaseDecodeHead_clips):
     """
@@ -245,6 +536,16 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # self.deco4=small_decoder2(embedding_dim,512, self.num_classes)
 
         self.hypercorre_module=hypercorre_topk2(dim=self.in_channels, backbone=self.backbone)
+        
+        self.spatial_context_head = SpatialTemporalGather_Module(124)
+        
+        self.spatial_ocr_head = SpatialOCR_Module(in_channels=512, 
+                                                  key_channels=256, 
+                                                  out_channels=512,
+                                                  scale=1,
+                                                  dropout=0.05)
+        
+        self.memory=[]
         
         self.refine_block = nn.Sequential(
             # nn.Conv2d(512,512,kernel_size=3, stride=1, padding=1, bias=False),
@@ -380,25 +681,25 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         # query_c4=query_c4.reshape(batch_size, (num_clips-1), -1, query_c4.shape[-2], query_c4.shape[-1])
         
         
-        if len(feats)>0:
-            B,num_clips_select,cx,hx_supp,wx_supp = supp_c1.shape
-            supp_frame_selected = supp_c1.permute(0,1,3,4,2)
-            supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx_supp*wx_supp,cx)) #b,-1,cx
+        # if len(feats)>0:
+        #     B,num_clips_select,cx,hx_supp,wx_supp = supp_c1.shape
+        #     supp_frame_selected = supp_c1.permute(0,1,3,4,2)
+        #     supp_frame_selected = self.linear1(supp_frame_selected.reshape(B,num_clips_select*hx_supp*wx_supp,cx)) #b,-1,cx
             
-            B,cx,hx,wx=feats.shape 
-            # B,cx=feats.shape 
+        #     B,cx,hx,wx=feats.shape 
+        #     # B,cx=feats.shape 
             
-            memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
-            # memory_feature = self.linear2(feats)
+        #     memory_feature = self.linear2(feats.permute(0,2,3,1).reshape(B,hx*wx,cx))
+        #     # memory_feature = self.linear2(feats)
             
-            atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
+        #     atten = torch.matmul(supp_frame_selected,memory_feature.transpose(-1,-2)) #b,h,w,c c,b = b,h,w,b * b,c 
 
-            #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-            # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
-            # print('ts',torch.matmul(atten,memory_feature).shape)
+        #     #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
+        #     # print('ss',supp_frame_selected.shape,memory_feature.transpose(-1,-2).shape)
+        #     # print('ts',torch.matmul(atten,memory_feature).shape)
             
-            supp_c1 = torch.matmul(atten,memory_feature).reshape(B,hx_supp,wx_supp,cx).permute(0,3,1,2)
-            supp_c1 = supp_c1.unsqueeze(1)
+        #     supp_c1 = torch.matmul(atten,memory_feature).reshape(B,hx_supp,wx_supp,cx).permute(0,3,1,2)
+        #     supp_c1 = supp_c1.unsqueeze(1)
         
         
         supp_frame = [supp_c1, supp_c2, supp_c3, supp_c4]
@@ -487,6 +788,44 @@ class SegFormerHead_clipsNet(BaseDecodeHead_clips):
         supp_feats=[ii.squeeze(1) for ii in supp_feats]
 
         outs=supp_feats
+        
+        if self.training:
+            outs[1] = F.interpolate(input=outs[1], size=(h, w), mode='bilinear', align_corners=False)
+            outs[2] = F.interpolate(input=outs[2], size=(h, w), mode='bilinear', align_corners=False)
+            outs[3] = F.interpolate(input=outs[3], size=(h, w), mode='bilinear', align_corners=False)
+        else:
+            outs[1] = F.interpolate(input=outs[1], size=(h, w), mode='bilinear', align_corners=False)
+            outs[2] = F.interpolate(input=outs[2], size=(h, w), mode='bilinear', align_corners=False)
+            outs[3] = F.interpolate(input=outs[3], size=(h, w), mode='bilinear', align_corners=False)
+
+        outs_feature = torch.cat(outs[1:],dim=0)
+        
+        
+        if not self.training:
+            if len(self.memory)!=0:
+                # print("on memory",len(self.memory),id(self.memory),self.memory[0].shape)
+                context = self.spatial_context_head(outs_feature,x[:,1:].squeeze(0),1,self.memory,8)
+            else:
+                # print("empty memory")
+                self.memory=[]
+                context = self.spatial_context_head(outs_feature,x[:,1:].squeeze(0),1,self.memory,8)
+        else:
+            context = self.spatial_context_head(outs_feature,x[:,1:].squeeze(0),1)
+        
+        # print("shape",outs_feature.shape,context.shape)
+        # shape torch.Size([3, 512, 120, 120]) torch.Size([1, 512, 124, 1])
+        
+        outs_feat = self.spatial_ocr_head(outs_feature,context)
+        
+        b_s,cx_o,h_o,w_o = outs_feat.shape
+        
+        sub_feature = torch.split(outs_feat,1,dim=0)
+        
+        # print("sq",[i.shape for i in sub_feature],b_s)
+        
+        outs[1] = sub_feature[0]
+        outs[2] = sub_feature[1]
+        outs[3] = sub_feature[2]
         
         # print("sssqq",[i.shape for i in outs])
         

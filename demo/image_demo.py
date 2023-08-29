@@ -1,5 +1,8 @@
 from argparse import ArgumentParser
 
+import sys
+sys.path.append("/datadisk/lixinhao/vss")
+
 from mmseg.apis import inference_segmentor, init_segmentor, show_result_pyplot
 from mmseg.core.evaluation import get_palette
 

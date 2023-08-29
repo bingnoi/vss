@@ -141,32 +141,32 @@ def multi_gpu_test(model,
         prog_bar = mmcv.ProgressBar(len(dataset))
     memory = None
     for i, data in enumerate(data_loader):
-        # gap=9
-        # # print(len(data['img'][0]))
-        # # print(type(data['img'][0][0]))
-        # # print(data['img'][0][0].shape)
-        # if len(data['img'][0]) > 10:
-        #     for j in range(gap,len(data['img'][0]),len(data['img'][0])-gap-1):
-        #         imgs=data['img'][0][j-gap:j]
+        gap=9
+        # print(len(data['img'][0]))
+        # print(type(data['img'][0][0]))
+        # print(data['img'][0][0].shape)
+        if len(data['img'][0]) > 10:
+            for j in range(gap,len(data['img'][0]),len(data['img'][0])-gap-1):
+                imgs=data['img'][0][j-gap:j]
                 
                 
-        #         data_batch_s = dict()
-        #         data_batch_s['img_metas'] = data['img_metas']
-        #         data_batch_s['img'] = [imgs]
+                data_batch_s = dict()
+                data_batch_s['img_metas'] = data['img_metas']
+                data_batch_s['img'] = [imgs]
                 
-        #         # print(data_batch_s.keys())
-        #         # print('1qq',len(data_batch_s['img'][0]))
-        #         # print('1qq',type(data_batch_s['img'][0][0]))
-        #         # print('1qq',data_batch_s['img'][0][0].shape)
-        #         # exit()
+                # print(data_batch_s.keys())
+                # print('1qq',len(data_batch_s['img'][0]))
+                # print('1qq',type(data_batch_s['img'][0][0]))
+                # print('1qq',data_batch_s['img'][0][0].shape)
+                # exit()
                 
-        #         with torch.no_grad():
-        #             result,memory = model(memory,return_loss=False, rescale=True, **data_batch_s)
-        # else:
-        #     with torch.no_grad():
-        #         result,memory = model(memory,return_loss=False, rescale=True, **data)
-        with torch.no_grad():
-            result,memory = model(memory,return_loss=False, rescale=True, **data)
+                with torch.no_grad():
+                    result,memory = model(memory,return_loss=False, rescale=True, **data_batch_s)
+        else:
+            with torch.no_grad():
+                result,memory = model(memory,return_loss=False, rescale=True, **data)
+        # with torch.no_grad():
+        #     result,memory = model(memory,return_loss=False, rescale=True, **data)
 
 
         if isinstance(result, list):
@@ -178,8 +178,6 @@ def multi_gpu_test(model,
                 result = np2tmp(result)
             results.append(result)
         
-        print('devices',len(result))
-        exit()
 
         if rank == 0:
             # batch_size = data['img'][0].size(0)
@@ -189,6 +187,8 @@ def multi_gpu_test(model,
                 batch_size = data['img'][0][0].size(0)
             for _ in range(batch_size * world_size):
                 prog_bar.update()
+                
+        torch.cuda.empty_cache()
 
     # collect results from all ranks
     if gpu_collect:
