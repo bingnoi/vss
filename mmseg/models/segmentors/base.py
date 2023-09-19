@@ -73,7 +73,7 @@ class BaseSegmentor(nn.Module):
             logger = logging.getLogger()
             logger.info(f'load model from: {pretrained}')
 
-    def forward_test(self,memory, imgs, img_metas, **kwargs):
+    def forward_test(self, imgs, img_metas, **kwargs):
         """
         Args:
             imgs (List[Tensor]): the outer list indicates test-time
@@ -106,12 +106,12 @@ class BaseSegmentor(nn.Module):
             assert all(shape == pad_shapes[0] for shape in pad_shapes)
 
         if num_augs == 1:
-            return self.simple_test(memory,imgs[0], img_metas[0], **kwargs)
+            return self.simple_test(imgs[0], img_metas[0], **kwargs)
         else:
-            return self.aug_test(memory,imgs, img_metas, **kwargs)
+            return self.aug_test(imgs, img_metas, **kwargs)
 
     @auto_fp16(apply_to=('img', ))
-    def forward(self,memory, img, img_metas, return_loss=True, **kwargs):
+    def forward(self, img, img_metas, return_loss=True, **kwargs):
         """Calls either :func:`forward_train` or :func:`forward_test` depending
         on whether ``return_loss`` is ``True``.
 
@@ -122,11 +122,11 @@ class BaseSegmentor(nn.Module):
         the outer list indicating test time augmentations.
         """
         if return_loss:
-            return self.forward_train(memory,img, img_metas, **kwargs)
+            return self.forward_train(img, img_metas, **kwargs)
         else:
-            return self.forward_test(memory,img, img_metas, **kwargs)
+            return self.forward_test(img, img_metas, **kwargs)
 
-    def train_step(self, data_batch, optimizer,memory, **kwargs):
+    def train_step(self, data_batch, optimizer, **kwargs):
         """The iteration step during training.
 
         This method defines an iteration step during training, except for the
@@ -156,7 +156,7 @@ class BaseSegmentor(nn.Module):
         # print(data_batch.keys())
         # print(data_batch['img'].shape, data_batch['gt_semantic_seg'].shape) # torch.Size([1, 3, 3, 480, 480]) torch.Size([1, 3, 1, 480, 480])
         # exit()
-        losses,memory = self(memory,**data_batch)
+        losses = self(**data_batch)
         loss, log_vars = self._parse_losses(losses)
         num_samples=len(data_batch['img'].data)
         # num_samples=data_batch['img'].shape[1]
@@ -168,7 +168,7 @@ class BaseSegmentor(nn.Module):
 
         # print(losses,outputs)
         # exit()
-        return outputs,memory
+        return outputs
 
     def val_step(self, data_batch, **kwargs):
         """The iteration step during validation.

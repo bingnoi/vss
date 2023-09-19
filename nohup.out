@@ -1,1 +1,31 @@
 /home/lixinhao/anaconda3/bin/python: Error while finding module specification for 'torch.distributed.launch' (ModuleNotFoundError: No module named 'torch')
+Traceback (most recent call last):
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/runpy.py", line 193, in _run_module_as_main
+    "__main__", mod_spec)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/runpy.py", line 85, in _run_code
+    exec(code, run_globals)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/torch/distributed/launch.py", line 260, in <module>
+    main()
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/torch/distributed/launch.py", line 253, in main
+    process.wait()
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/subprocess.py", line 1019, in wait
+    return self._wait(timeout=timeout)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/subprocess.py", line 1653, in _wait
+    (pid, sts) = self._try_wait(0)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/subprocess.py", line 1611, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "./tools/train.py", line 7, in <module>
+    import mmcv
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/mmcv/__init__.py", line 4, in <module>
+    from .fileio import *
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/mmcv/fileio/__init__.py", line 4, in <module>
+    from .io import dump, load, register_handler
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/mmcv/fileio/io.py", line 4, in <module>
+    from ..utils import is_list_of, is_str
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/mmcv/utils/__init__.py", line 16, in <module>
+    import torch
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/torch/__init__.py", line 190, in <module>
+    from torch._C import *
+RuntimeError: KeyboardInterrupt: 

@@ -35,7 +35,8 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
     def __init__(self, feature_strides, **kwargs):
         super(SegFormerHead_clips, self).__init__(input_transform='multiple_select', **kwargs)
         self.net = SegFormerHead_clipsNet(feature_strides = feature_strides,**kwargs)
-        self.memory = FeatureMemory()
+        # self.memory = FeatureMemory()
+        # self.memorylist=[]
         
 
     def forward(self, inputs,batch_size, num_clips,gt_semantic_seg,memory):
@@ -97,15 +98,20 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
         if memory != None:
             skip_frame = 2 #总长度-1-单次跑的帧
             former_frame = 8 #单次跑的帧-1
+        
+        memorylist = torch.split(memory,split_size_or_sections=1)
+        memorylist = [i for i in memorylist]
+        # print("shape12",type(memorylist),memorylist[0].shape)
+        # exit()
         # 第一是可能出现overlap,第二是可能出现0-5帧的重复更新特征
         if not self.training:
             gt_semantic_seg = torch.empty(2,2)
         if frame_len < frame_gap_l:
-            if self.training:
-                memoryFeature = []
-            else:
-                memoryFeature = self.memory.memory.data
-            out = self.net(mode='segment',feats=memoryFeature,inputs=inputs,batch_size=1,num_clips=frame_len,segmentation=gt_semantic_seg)
+            # if self.training:
+            memoryFeature = []
+            # else:
+            #     memoryFeature = self.memory.memory.data
+            out = self.net(mode='segment',feats=memoryFeature,memorylist=memorylist,inputs=inputs,batch_size=1,num_clips=frame_len,segmentation=gt_semantic_seg)
             return out,memoryFeature
         else:
             memoryFeature = None
@@ -116,7 +122,7 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
                         frame_in.append(torch.stack([inputs[sh][q,:] for q in range(i-frame_gap_l+1,i+1,frame_gap)],dim=0))
                     # print('shape1',[i.shape for i in frame_in])
                     # print("segment",i,memoryFeature.shape)
-                    out = self.net(mode='segment',feats=memoryFeature,inputs=frame_in,batch_size=1,num_clips=4,segmentation=gt_semantic_seg[:,:1])
+                    out = self.net(mode='segment',feats=memoryFeature,memorylist=memorylist,inputs=frame_in,batch_size=1,num_clips=4,segmentation=gt_semantic_seg[:,:1])
                     # print('o2 ',out.shape,frame_len)
                     out_to.append(out)
             # for i in range(frame_len):
@@ -153,4 +159,10 @@ class SegFormerHead_clips(BaseDecodeHead_clips):
             out_to = [out_to[-1]]
         out = torch.cat(out_to,dim=1)
         
-        return out,memoryFeature
+        # print(type(memorylist),len(memorylist))
+        memorylist_back = [torch.tensor(i).to('cuda') for i in memorylist]
+        memorylist_back = torch.cat(memorylist_back,dim=0)
+        # print("mm",memorylist_back.shape)
+        # exit()
+        
+        return out,memorylist_back
