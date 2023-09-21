@@ -35,7 +35,7 @@ class  TransformerZeroshotPredictor(nn.Module):
         mask_dim=256
         
         #not certain
-        num_queries = 256
+        num_queries = 100
         in_channels = 256
         enforce_input_project = False
         temperature = 0.01

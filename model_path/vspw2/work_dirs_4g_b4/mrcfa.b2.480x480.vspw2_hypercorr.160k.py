@@ -2,7 +2,7 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 find_unused_parameters = True
 model = dict(
     type='EncoderDecoder_clips',
-    pretrained='/home/lixinhao/original/mit_b2.pth',
+    pretrained='/home/lixinhao/mit_b2.pth',
     backbone=dict(type='mit_b2', style='pytorch'),
     decode_head=dict(
         type='SegFormerHead_ZeroShot',
@@ -171,9 +171,9 @@ workflow = [('train', 1)]
 cudnn_benchmark = True
 optimizer = dict(
     type='AdamW',
-    lr=6e-05,
+    lr=0.0001,
     betas=(0.9, 0.999),
-    weight_decay=0.01,
+    weight_decay=0.0001,
     paramwise_cfg=dict(
         custom_keys=dict(
             pos_block=dict(decay_mult=0.0),
@@ -191,5 +191,5 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=160000)
 checkpoint_config = dict(by_epoch=False, interval=4000)
 evaluation = dict(interval=160000, metric='mIoU')
-work_dir = 'model_path/vspw2/work_dirs_4g_b4'
+work_dir = 'model_path/vspw2/work_dirs_4g_b4/'
 gpu_ids = range(0, 1)

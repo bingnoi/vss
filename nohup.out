@@ -29,3 +29,61 @@ Traceback (most recent call last):
   File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/torch/__init__.py", line 190, in <module>
     from torch._C import *
 RuntimeError: KeyboardInterrupt: 
+Traceback (most recent call last):
+  File "./tools/train.py", line 13, in <module>
+    from mmseg.apis import set_random_seed, train_segmentor
+  File "/home/lixinhao/vss/mmseg/apis/__init__.py", line 1, in <module>
+    from .inference import inference_segmentor, init_segmentor, show_result_pyplot
+  File "/home/lixinhao/vss/mmseg/apis/inference.py", line 8, in <module>
+    from mmseg.models import build_segmentor
+  File "/home/lixinhao/vss/mmseg/models/__init__.py", line 1, in <module>
+    from .backbones import *  # noqa: F401,F403
+  File "/home/lixinhao/vss/mmseg/models/backbones/__init__.py", line 2, in <module>
+    from .fast_scnn import FastSCNN
+  File "/home/lixinhao/vss/mmseg/models/backbones/fast_scnn.py", line 7, in <module>
+    from mmseg.models.decode_heads.psp_head import PPM
+  File "/home/lixinhao/vss/mmseg/models/decode_heads/__init__.py", line 27, in <module>
+    from .segformer_voca import SegFormerHead_ZeroShot
+  File "/home/lixinhao/vss/mmseg/models/decode_heads/segformer_voca.py", line 27, in <module>
+    from .zero_shot_predictor import TransformerZeroshotPredictor
+  File "/home/lixinhao/vss/mmseg/models/decode_heads/zero_shot_predictor.py", line 8, in <module>
+    from .third_party import clip
+  File "/home/lixinhao/vss/mmseg/models/decode_heads/third_party/clip.py", line 16, in <module>
+    _tokenizer = _Tokenizer()
+  File "/home/lixinhao/vss/mmseg/models/decode_heads/third_party/simple_tokenizer.py", line 78, in __init__
+    self.pat = re.compile(r"""<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+""", re.IGNORECASE)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/regex/regex.py", line 353, in compile
+    return _compile(pattern, flags, ignore_unused, kwargs, cache_pattern)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/regex/regex.py", line 565, in _compile
+    info.flags |= UNICODE
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/enum.py", line 838, in __or__
+    result = self.__class__(self._value_ | self.__class__(other)._value_)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/enum.py", line 315, in __call__
+    return cls.__new__(cls, value)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/enum.py", line 553, in __new__
+    result = cls._missing_(value)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/enum.py", line 802, in _missing_
+    new_member = cls._create_pseudo_member_(value)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/enum.py", line 811, in _create_pseudo_member_
+    _, extra_flags = _decompose(cls, value)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/enum.py", line 896, in _decompose
+    for v, m in list(flag._value2member_map_.items())
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/enum.py", line 897, in <listcomp>
+    if m.name is not None or _power_of_two(v)
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/runpy.py", line 193, in _run_module_as_main
+    "__main__", mod_spec)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/runpy.py", line 85, in _run_code
+    exec(code, run_globals)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/torch/distributed/launch.py", line 260, in <module>
+    main()
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/site-packages/torch/distributed/launch.py", line 253, in main
+    process.wait()
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/subprocess.py", line 1019, in wait
+    return self._wait(timeout=timeout)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/subprocess.py", line 1653, in _wait
+    (pid, sts) = self._try_wait(0)
+  File "/home/lixinhao/anaconda3/envs/vss/lib/python3.7/subprocess.py", line 1611, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+KeyboardInterrupt
