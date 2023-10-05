@@ -1,14 +1,17 @@
-# import numpy as np
-# from PIL import Image
+import mmcv
+import numpy as np
 
-# origin_path = '/home/lixinhao/vss/data/test/vspw/VSPW_480p/data/127_-hIVCYO4C90/mask/00001629.png'
-# origin_img_path = '/home/lixinhao/vss/data/test/vspw/VSPW_480p/data/127_-hIVCYO4C90/origin/00001629.jpg'
-# new_path='/home/lixinhao/vss/data/test/vspw/VSPW_480p/Detectron/val_all/data/127_-hIVCYO4C90/00001629.png'
+origin_file_name = "/home/lixinhao/vss/data/test/vspw/VSPW_480p/data/0_wHveSGjXyDY/mask/00000174.png"
+oc =  mmcv.imread(origin_file_name,flag="unchanged",backend="pillow")
 
-# labii = np.asarray(Image.open(origin_path))
-# new_path_pii = np.asarray(Image.open(origin_img_path))
-# new_pathii = np.asarray(Image.open(new_path))
+file_name = "/home/lixinhao/vss/data/test/vspw/VSPW_480p/data/1385_Ycwibat6X-M/mask/00000602.png"
+c =  mmcv.imread(file_name,flag="unchanged",backend="pillow")
+
+new_file_name = "/home/lixinhao/vss/data/test/vspw/VSPW_480p/Detectron/train_seen/data/1385_Ycwibat6X-M/00000602.png"
+cs =  mmcv.imread(new_file_name,flag="unchanged",backend="pillow")
+
+print(np.unique(oc),np.unique(c),np.unique(cs))
 
 
-# print(np.unique(labii),np.unique(new_path_pii),np.unique(new_pathii))
-
+v = mmcv.imread("1_result.png")
+print(np.unique(v))

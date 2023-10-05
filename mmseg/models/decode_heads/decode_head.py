@@ -414,7 +414,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         """Placeholder of forward function."""
         pass
 
-    def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg,batch_size, num_clips):
+    def forward_train(self, inputs, img,img_metas, gt_semantic_seg, train_cfg,batch_size, num_clips):
         """Forward function for training.
         Args:
             inputs (list[Tensor]): List of multi-level img features.
@@ -430,7 +430,8 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
-        seg_logits = self.forward(inputs,batch_size, num_clips)
+        # print(img_metas)
+        seg_logits = self.forward(inputs,img,batch_size, num_clips)
         losses = self.losses(seg_logits, inputs,gt_semantic_seg)
         return losses
 
@@ -509,92 +510,113 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
     def losses(self, seg_logit, images,seg_label):
         """Compute segmentation loss."""
         
-        ins_data = []
-        split_group = torch.split(seg_label,split_size_or_sections=1,dim=1)
-        # print("ssk",seg_label.shape,[i.shape for i in split_group])
-        for i_label in split_group:
-            sem_seg_gt = i_label
-            sem_seg = sem_seg_gt.cpu().numpy()
-            classes = np.unique(sem_seg)
-            classes = classes[classes != self.ignore_index]
-            
-            gt_classes = torch.tensor(classes,dtype=torch.int64)
-            masks = []
-            for class_id in classes:
-                masks.append(sem_seg == class_id)
-                # print("see",class_id,np.count_nonzero(sem_seg == class_id))
-            # exit()
-            if len(masks) == 0:
-                gt_mask = torch.zeros((0, sem_seg.shape[-2], sem_seg.shape[-1]))
-            else:
-                gt_mask = torch.stack([torch.from_numpy(np.ascontiguousarray(x.copy())) for x in masks])
+        targets = seg_label
+        outputs = F.interpolate(seg_logit, size=(targets.shape[-2], targets.shape[-1]), mode="bilinear", align_corners=False)
         
-            ins = {}
-            
-            gt_classes = gt_classes.to('cuda' if torch.cuda.is_available() else 'cpu')
-            gt_mask = gt_mask.to('cuda' if torch.cuda.is_available() else 'cpu').squeeze()
-            
-            
-            if len(gt_mask.shape) < 3:
-                gt_mask=gt_mask.unsqueeze(0)
-            
-            ins['gt_classes'] = gt_classes
-            ins['gt_masks'] = gt_mask
-            
-            
-            ins_data.append(ins)
-            
-        mask_weight = 20
-        dice_weight = 1
-        deep_supervision = True
-        no_object_weight =0.1
+        num_classes = outputs.shape[1]
+        mask = targets != 255
         
-        matcher = HungarianMatcher(
-            cost_class=1,
-            cost_mask=mask_weight,
-            cost_dice=dice_weight,
-        )
-        weight_dict = {"loss_ce": 1, "loss_mask": mask_weight, "loss_dice": dice_weight}
-        if deep_supervision:
-            dec_layers = 6
-            aux_weight_dict = {}
-            for i in range(dec_layers - 1):
-                aux_weight_dict.update({k + f"_{i}": v for k, v in weight_dict.items()})
-            weight_dict.update(aux_weight_dict)
+        outputs = outputs.permute(0,2,3,1)
+        _targets = torch.zeros(outputs.shape, device=outputs.device)
+        print(outputs.shape,num_classes,targets[mask].shape,seg_label.shape)
+        _onehot = F.one_hot(targets[mask], num_classes=num_classes).float()
+        _targets[mask] = _onehot
         
-        losses = ["labels", "masks"]
-        self.criterion = SetCriterion(
-            111,
-            matcher=matcher,
-            weight_dict=weight_dict,
-            eos_coef=no_object_weight,
-            losses=losses,
-        )
-        
-        targets = self.prepare_targets(ins_data,images)
-        
-        # seg_logit['pred_logits'] = seg_logit['pred_logits'].to('cpu')
-        # seg_logit['pred_masks']=seg_logit['pred_masks'].to('cpu')
-        
-        # print("kk",seg_logit['pred_logits'].shape,seg_logit['pred_masks'].shape)
-        # exit()
-        losses = self.criterion(seg_logit,targets)
-        
-        for k in list(losses.keys()):
-            if k in self.criterion.weight_dict:
-                losses[k] *= self.criterion.weight_dict[k]
-            else:
-                # remove this loss if not specified in `weight_dict`
-                losses.pop(k)
-
+        loss = F.binary_cross_entropy_with_logits(outputs, _targets)
+        losses = {"loss_sem_seg" : loss}
         return losses
         
+        # ins_data = []
+        # # print("sp",seg_label.shape)
+        # # exit()
+        # b,n,_,h,w = seg_label.shape
+        # seg_label = seg_label.reshape(b*n,_,h,w)
+        # split_group = torch.split(seg_label,split_size_or_sections=1,dim=0)
+        # # print("ssk",seg_label.shape,[i.shape for i in split_group])
+        # for i_label in split_group:
+        #     sem_seg_gt = i_label
+        #     sem_seg = sem_seg_gt.cpu().numpy()
+        #     classes = np.unique(sem_seg)
+        #     classes = classes[classes != self.ignore_index]
+            
+        #     gt_classes = torch.tensor(classes,dtype=torch.int64)
+        #     masks = []
+        #     for class_id in classes:
+        #         masks.append(sem_seg == class_id)
+        #         # print("see",class_id,np.count_nonzero(sem_seg == class_id))
+        #     # exit()
+        #     if len(masks) == 0:
+        #         gt_mask = torch.zeros((0, sem_seg.shape[-2], sem_seg.shape[-1]))
+        #     else:
+        #         gt_mask = torch.stack([torch.from_numpy(np.ascontiguousarray(x.copy())) for x in masks])
         
-        # torch.Size([1, 8, 124, 120, 120]) torch.Size([1, 4, 1, 480, 480])
+        #     ins = {}
+            
+        #     gt_classes = gt_classes.to('cuda' if torch.cuda.is_available() else 'cpu')
+        #     gt_mask = gt_mask.to('cuda' if torch.cuda.is_available() else 'cpu').squeeze()
+            
+            
+        #     if len(gt_mask.shape) < 3:
+        #         gt_mask=gt_mask.unsqueeze(0)
+            
+        #     ins['gt_classes'] = gt_classes
+        #     ins['gt_masks'] = gt_mask
+            
+        #     # print(gt_classes)
+            
+        #     ins_data.append(ins)
+        
+        # # exit()
+        # mask_weight = 20
+        # dice_weight = 1
+        # deep_supervision = True
+        # no_object_weight =0.1
+        
+        # matcher = HungarianMatcher(
+        #     cost_class=1,
+        #     cost_mask=mask_weight,
+        #     cost_dice=dice_weight,
+        # )
+        # weight_dict = {"loss_ce": 1, "loss_mask": mask_weight, "loss_dice": dice_weight}
+        # if deep_supervision:
+        #     dec_layers = 6
+        #     aux_weight_dict = {}
+        #     for i in range(dec_layers - 1):
+        #         aux_weight_dict.update({k + f"_{i}": v for k, v in weight_dict.items()})
+        #     weight_dict.update(aux_weight_dict)
+        
+        # losses = ["labels", "masks"]
+        # self.criterion = SetCriterion(
+        #     111,
+        #     matcher=matcher,
+        #     weight_dict=weight_dict,
+        #     eos_coef=no_object_weight,
+        #     losses=losses,
+        # )
+        
+        # targets = self.prepare_targets(ins_data,images)
+        
+        # # seg_logit['pred_logits'] = seg_logit['pred_logits'].to('cpu')
+        # # seg_logit['pred_masks']=seg_logit['pred_masks'].to('cpu')
+        
+        # # print("kk",seg_logit['pred_logits'].shape,seg_logit['pred_masks'].shape)
+        # # exit()
+        # losses = self.criterion(seg_logit,targets)
+        
+        # for k in list(losses.keys()):
+        #     if k in self.criterion.weight_dict:
+        #         losses[k] *= self.criterion.weight_dict[k]
+        #     else:
+        #         # remove this loss if not specified in `weight_dict`
+        #         losses.pop(k)
 
-        # assert seg_logit.dim()==5 and seg_label.dim()==5
+        # return losses
+        
+        
+        
 
-        # loss = dict()
+
+
 
         # if self.hypercorre and self.cityscape:
         #     # print("here1")

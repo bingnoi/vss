@@ -41,13 +41,13 @@ class Evaluator(object):
 
     def _generate_matrix(self, gt_image, pre_image):
         mask = (gt_image >= 0) & (gt_image < self.num_class)
-        print(mask)
-        print(gt_image.shape)
-        print(gt_image[mask])
+        # print(mask)
+        # print(gt_image.shape)
+        # print(gt_image[mask])
         label = self.num_class * gt_image[mask].astype('int') + pre_image[mask]
-        print(label.shape)
+        # print(label.shape)
         count = np.bincount(label, minlength=self.num_class**2)
-        print(len(count),self.num_class)
+        # print(len(count),self.num_class)
         confusion_matrix = count.reshape(self.num_class, self.num_class)
         return confusion_matrix
 
@@ -167,27 +167,8 @@ def intersect_and_union2(pred_label,
     
     intersect = pred_label[pred_label == label]
     
-    print('c1',np.unique(label),np.unique(pred_label),len(np.unique(pred_label)),num_classes)
-    print(intersect.shape)
-#     ccc ['/datadisk/tmpfile/tmplyl_f6uo.npy'] [  0   3   7   8  11  12  53  54  59  67  80  94 255]
-# [[False False False ...  True  True  True]
-#  [False False False ...  True  True  True]
-#  [False False False ...  True  True  True]
-#  ...
-#  [ True  True  True ... False False False]
-#  [ True  True  True ... False False False]
-#  [ True  True  True ... False False False]]
-# (480, 853)
-# [ 7  7  7 ... 47 47 47]
-# (299041,)
-# 12321 111
-# c1 [ 2  6  7 10 46 47 52 58 71 84] [  0  14  22  29  35  39  40  58  60  69  78  84  93 103 116 124 128 131
-#  132 137 149 152 162 171 179 181 195 199 210 227 228 242 243 244 248 253
-#  255 257 260 263 264 284 290 303 305 306 313 317 321 336 337 341 347 348
-#  352 359 365 367 396 397 400 401 402 408 416 418 422 426 432 440 446 450
-#  462 463 465 470 489 496 497] 111
-# (2576,)
-# ii False
+    # print('c1',np.unique(label),np.unique(pred_label),len(np.unique(pred_label)),num_classes)
+    # print(intersect.shape)
     
     area_intersect, _ = np.histogram(
         intersect, bins=np.arange(num_classes + 1))
@@ -195,7 +176,9 @@ def intersect_and_union2(pred_label,
         pred_label, bins=np.arange(num_classes + 1))
     area_label, _ = np.histogram(label, bins=np.arange(num_classes + 1))
     
-    print("ii",np.all(area_intersect==0))
+    # print("ii1",area_intersect)
+    # print("ii2",area_pred_label)
+    # print("ii3",area_label)
     # exit()
     area_union = area_pred_label + area_label - area_intersect
 
@@ -237,7 +220,7 @@ def total_intersect_and_union(results,
     evaluator = Evaluator(num_classes)
     evaluator.reset()
     for i in range(num_imgs):
-        print("ccc",np.unique(results[i]),np.unique(gt_seg_maps[i]))
+        # print("ccc",np.unique(results[i]),np.unique(gt_seg_maps[i]))
         area_intersect, area_union, area_pred_label, area_label = \
             intersect_and_union2(results[i], gt_seg_maps[i], num_classes,
                                 ignore_index, label_map, reduce_zero_label, evaluator)

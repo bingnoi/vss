@@ -22,7 +22,8 @@ class BasePixelDecoder(nn.Module):
         
         use_bias = norm == ""
         
-        features_channels = [64,128,320,512] 
+        features_channels = [64,128,320,512]
+        # features_channels =[256,512,1024,2048] 
         self.in_features = features_channels
         
         for idx,in_channels in enumerate(features_channels):

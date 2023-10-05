@@ -285,8 +285,8 @@ class SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4(BaseDecod
         #     # print(x.shape, num_clips, self.num_clips, self.training)
         #     return x[:,-2]
 
-        start_time1=time.time()
-        shape_c1, shape_c2, shape_c3, shape_c4=c1.size()[2:], c2.size()[2:], c3.size()[2:], c4.size()[2:]
+        # start_time1=time.time()
+        # shape_c1, shape_c2, shape_c3, shape_c4=c1.size()[2:], c2.size()[2:], c3.size()[2:], c4.size()[2:]
         c1=c1.reshape(batch_size, num_clips, -1, c1.shape[-2], c1.shape[-1])
         c2=c2.reshape(batch_size, num_clips, -1, c2.shape[-2], c2.shape[-1])
         c3=c3.reshape(batch_size, num_clips, -1, c3.shape[-2], c3.shape[-1])

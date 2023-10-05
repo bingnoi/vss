@@ -625,17 +625,17 @@ VSPW_CATEGORIES = [{
     'name': 'train'
 }]
 
-for item in VSPW_CATEGORIES:
-    item['id'] = item['id'] - 1
+# for item in VSPW_CATEGORIES:
+#     item['id'] = item['id'] - 1
 
-COCO_CATEGORIES_Seen = []
-COCO_CATEGORIES_unseen = []
+# COCO_CATEGORIES_Seen = []
+# COCO_CATEGORIES_unseen = []
 
-seen_cls = np.load(r'/home/lixinhao/vss/mmseg/handle_data/group_seen.npy')
-val_cls = np.load(r'/home/lixinhao/vss/mmseg/handle_data/group_unseen.npy')
-novel_cls = np.load(r'/home/lixinhao/vss/mmseg/handle_data/group_novel.npy')
+# seen_cls = np.load(r'/home/lixinhao/vss/mmseg/handle_data/group_seen.npy')
+# val_cls = np.load(r'/home/lixinhao/vss/mmseg/handle_data/group_unseen.npy')
+# novel_cls = np.load(r'/home/lixinhao/vss/mmseg/handle_data/group_novel.npy')
 
-train_cls = seen_cls.tolist() + val_cls.tolist()
+# train_cls = seen_cls.tolist() + val_cls.tolist()
 
 seen_classnames = []
 unseen_classnames = []
@@ -646,17 +646,17 @@ for item in VSPW_CATEGORIES:
     id = item['id']
     name = item['name']
 
-    if id in train_cls:
+    if int(id)<=111:
         seen_classnames.append(name)
         tmp = copy.deepcopy(item)
         tmp['trainId'] = count_train
-        COCO_CATEGORIES_Seen.append(tmp)
+        # COCO_CATEGORIES_Seen.append(tmp)
         count_train = count_train + 1
     else:
         unseen_classnames.append(name)
         tmp = copy.deepcopy(item)
         tmp['trainId'] = count_test
-        COCO_CATEGORIES_unseen.append(tmp)
+        # COCO_CATEGORIES_unseen.append(tmp)
         count_test = count_test + 1
 
 with open(r'/home/lixinhao/vss/mmseg/handle_data/seen_classnames.json',

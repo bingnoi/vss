@@ -245,8 +245,11 @@ class BaseSegmentor(nn.Module):
             img (Tensor): Only if not `show` or `out_file`
         """
         img = mmcv.imread(img)
+        gt=mmcv.imread("/home/lixinhao/vss/data/test/vspw/VSPW_480p/data/0_wHveSGjXyDY/mask/00000174.png")[:,:,:1].squeeze(2)
+        
         img = img.copy()
         seg = result[0]
+        print(seg.shape,gt.shape)
         if palette is None:
             if self.PALETTE is None:
                 palette = np.random.randint(
@@ -254,7 +257,7 @@ class BaseSegmentor(nn.Module):
             else:
                 palette = self.PALETTE
         palette = np.array(palette)
-        assert palette.shape[0] == len(self.CLASSES)
+        # assert palette.shape[0] == len(self.CLASSES)
         assert palette.shape[1] == 3
         assert len(palette.shape) == 2
         color_seg = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
@@ -264,7 +267,8 @@ class BaseSegmentor(nn.Module):
         color_seg = color_seg[..., ::-1]
 
         # from IPython import embed; embed(header='debug vis')
-        img = img * 0.5 + color_seg * 0.5
+        img = img * 0.5 + color_seg * 0.54
+        img = color_seg
         img = img.astype(np.uint8)
         # if out_file specified, do not show image in window
         if out_file is not None:

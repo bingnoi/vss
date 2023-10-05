@@ -24,7 +24,9 @@ from .segformer_head import SegFormerHead
 
 from .segformer_interval import SegFormerHead_clips
 
-from .segformer_voca import SegFormerHead_ZeroShot
+from .segformer_voca import SegFormerHead_CAT
+
+from .cat_zeroshot_classifier import CatClassifier
 
 
 __all__ = [
@@ -32,5 +34,5 @@ __all__ = [
     'UPerHead', 'DepthwiseSeparableASPPHead', 'ANNHead', 'DAHead', 'OCRHead',
     'EncHead', 'DepthwiseSeparableFCNHead', 'FPNHead', 'EMAHead', 'DNLHead',
     'PointHead', 'APCHead', 'DMHead', 'LRASPPHead',
-    'SegFormerHead','SegFormerHead_clips','SegFormerHead_ZeroShot'
+    'SegFormerHead','SegFormerHead_clips','SegFormerHead_CAT','CatClassifier'
 ]

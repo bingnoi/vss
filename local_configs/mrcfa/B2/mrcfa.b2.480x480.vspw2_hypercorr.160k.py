@@ -14,12 +14,15 @@ model = dict(
     backbone=dict(
         type='mit_b2',
         style='pytorch'),
+        # type='ResNet',
+        # depth=101),
     decode_head=dict(
         # type='SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4',      ## SegFormerHead_clips2_resize_1_8_hypercorrelation3
         # type='MLPHead',
         # num_infer = 5,
-        type='SegFormerHead_ZeroShot',
+        type='SegFormerHead_CAT',
         in_channels=[64, 128, 320, 512],
+        # in_channels=[256,512,1024,2048],
         in_index=[0, 1, 2, 3],
         feature_strides=[4, 8, 16, 32],
         channels=128,
@@ -37,32 +40,27 @@ model = dict(
     test_cfg=dict(mode='whole'))
 
 # optimizer
-# optimizer = dict(_delete_=True, type='AdamW', lr=0.000006 , betas=(0.9, 0.999), weight_decay=0.01,
+# optimizer = dict(_delete_=True, type='AdamW', lr=0.00006 , betas=(0.9, 0.999), weight_decay=0.01,
 #                  paramwise_cfg=dict(custom_keys={'pos_block': dict(decay_mult=0.),
 #                                                  'norm': dict(decay_mult=0.),
 #                                                  'head': dict(lr_mult=10.)
 #                                                  }))
 
-optimizer = dict(_delete_=True, type='AdamW', lr=0.0001 , betas=(0.9, 0.999), weight_decay=0.0001,
+optimizer = dict(_delete_=True, type='AdamW', lr=1e-4 , betas=(0.9, 0.999), weight_decay=1e-4,
                  paramwise_cfg=dict(custom_keys={'pos_block': dict(decay_mult=0.),
                                                  'norm': dict(decay_mult=0.),
                                                  'head': dict(lr_mult=10.)
                                                  }))
 
-# lr_config = dict(_delete_=True, policy='poly',
-#                  warmup='linear',
-#                  warmup_iters=1500,
-#                  warmup_ratio=1e-6,
-#                 #  warmup_ratio=1e-8,
-#                  power=1.0, min_lr=0.0, by_epoch=False)
 
 lr_config = dict(_delete_=True, policy='poly',
                  warmup='linear',
                  warmup_iters=1500,
                  warmup_ratio=1e-6,
                 #  warmup_ratio=1e-8,
-                 power=1.0, min_lr=0.0, by_epoch=False)
+                 power=0.9, min_lr=0.0, by_epoch=False)
 
 data = dict(samples_per_gpu=1,workers_per_gpu=4)
+optimizer_config = dict(type='GradientCumulativeOptimizerHook', cumulative_iters=32)
 # evaluation = dict(interval=4000, metric='mIoU')
-evaluation = dict(interval=160000, metric='mIoU')
+evaluation = dict(interval=100000, metric='mIoU')

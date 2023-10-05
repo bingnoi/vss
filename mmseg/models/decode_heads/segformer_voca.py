@@ -18,15 +18,16 @@ import attr
 from IPython import embed
 
 import cv2
-from .hypercorre import hypercorre_topk2
+from .hyper_voca import hypercorre_topk2
 from .utils.utils import save_cluster_labels
 import time
 from ..builder import build_loss
 from torch.nn import functional as F
 
 from .zero_shot_predictor import TransformerZeroshotPredictor
+from .cat_zeroshot_classifier import CatClassifier
 from .per_pixel import BasePixelDecoder
-
+from .hyper_correlation import Corr
 
 def sem_seg_postprocess(result, img_size, output_height, output_width):
     """
@@ -138,13 +139,13 @@ class pooling_mhsa(nn.Module):
 
 
 @HEADS.register_module()
-class SegFormerHead_ZeroShot(BaseDecodeHead_clips):
+class SegFormerHead_CAT(BaseDecodeHead_clips):
     """
     SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers
     use hypercorrection in hsnet
     """
     def __init__(self, feature_strides, **kwargs):
-        super(SegFormerHead_ZeroShot, self).__init__(input_transform='multiple_select', **kwargs)
+        super(SegFormerHead_CAT, self).__init__(input_transform='multiple_select', **kwargs)
         assert len(feature_strides) == len(self.in_channels)
         assert min(feature_strides) == feature_strides[0]
         self.feature_strides = feature_strides
@@ -205,7 +206,7 @@ class SegFormerHead_ZeroShot(BaseDecodeHead_clips):
             self.sr1_feat=nn.Conv2d(embedding_dim, embedding_dim, kernel_size=2, stride=2)
 
         self.self_ensemble2=True
-        self.predictor = TransformerZeroshotPredictor()
+        self.predictor = CatClassifier()
         
         self.linearconv1 = nn.Conv2d(256,512,kernel_size=(1, 1), stride=(1, 1))
         
@@ -219,8 +220,10 @@ class SegFormerHead_ZeroShot(BaseDecodeHead_clips):
         self.ensembling_all_cls = True
         
         self.pixel_decoder = BasePixelDecoder()
+        
+        self.corr = Corr()
 
-    def forward(self,inputs, batch_size=None, num_clips=None):
+    def forward(self,inputs, img,batch_size=None, num_clips=None):
         
         # print('a ',len(inputs))
         # print('b ',inputs[0].shape)
@@ -228,14 +231,16 @@ class SegFormerHead_ZeroShot(BaseDecodeHead_clips):
 
         #每一层特征下做down_sample,按通道cancat,每一次s*c->s*4c
         start_time=time.time()
-        if self.training:
-            assert self.num_clips==num_clips
+        # if self.training:
+        #     assert self.num_clips==num_clips
         # if inputs[0].shape[0] == 1:
         #     a=input()
         x = self._transform_inputs(inputs)  # len=4, 1/4,1/8,1/16,1/32
         c1, c2, c3, c4 = x
         
-        save_x = x[::-1]
+        # print('in',[i.shape for i in x])
+        
+        save_x_1 = [i[0] for i in x]
 
         ############## MLP decoder on C1-C4 ###########
         n, _, h, w = c4.shape
@@ -264,19 +269,22 @@ class SegFormerHead_ZeroShot(BaseDecodeHead_clips):
         #downsample to c1(512,512)
 
         _, _, h, w=_c.shape
-        x = self.dropout(_c)
-        x = self.linear_pred(x)
+        # x = self.dropout(_c)
+        # x = self.linear_pred(x)
 
-        x = x.reshape(batch_size, num_clips, -1, h, w)
+        # mask_feature,transformer_encoder_feature = self.pixel_decoder(save_x)
+        # prediction =self.predictor(_c,mask_feature)
+
+        # x = x.reshape(batch_size, num_clips, -1, h, w)
 
         # c=input()
 
         # print(x.shape)
         
         # print(self.training,num_clips,self.num_clips)
-        if not self.training and num_clips!=self.num_clips:
-        # if not self.training:
-            return x[:,-1]
+        # if not self.training and num_clips!=self.num_clips:
+        # # if not self.training:
+        #     return x[:,-1]
 
         # if not self.training and num_clips!=self.num_clips:
         #     return x[:,-1]
@@ -284,125 +292,135 @@ class SegFormerHead_ZeroShot(BaseDecodeHead_clips):
         #     # print(x.shape, num_clips, self.num_clips, self.training)
         #     return x[:,-2]
 
-        start_time1=time.time()
-        shape_c1, shape_c2, shape_c3, shape_c4=c1.size()[2:], c2.size()[2:], c3.size()[2:], c4.size()[2:]
+        # start_time1=time.time()
+        # shape_c1, shape_c2, shape_c3, shape_c4=c1.size()[2:], c2.size()[2:], c3.size()[2:], c4.size()[2:]
         c1=c1.reshape(batch_size, num_clips, -1, c1.shape[-2], c1.shape[-1])
         c2=c2.reshape(batch_size, num_clips, -1, c2.shape[-2], c2.shape[-1])
         c3=c3.reshape(batch_size, num_clips, -1, c3.shape[-2], c3.shape[-1])
         c4=c4.reshape(batch_size, num_clips, -1, c4.shape[-2], c4.shape[-1])
         query_c1, query_c2, query_c3, query_c4=c1[:,:-1], c2[:,:-1], c3[:,:-1], c4[:,:-1]
-        # remove last frame
+        # # remove last frame
         
         
-        # query_c2=query_c2.reshape(batch_size*(num_clips-1), -1, shape_c2[0], shape_c2[1])
-        # query_c3=query_c3.reshape(batch_size*(num_clips-1), -1, shape_c3[0], shape_c3[1])
+        # # query_c2=query_c2.reshape(batch_size*(num_clips-1), -1, shape_c2[0], shape_c2[1])
+        # # query_c3=query_c3.reshape(batch_size*(num_clips-1), -1, shape_c3[0], shape_c3[1])
 
-        # query_c1=self.sr1(query_c1)
-        # query_c2=self.sr2(query_c2)
-        # query_c3=self.sr3(query_c3)
+        # # query_c1=self.sr1(query_c1)
+        # # query_c2=self.sr2(query_c2)
+        # # query_c3=self.sr3(query_c3)
 
-        # query_c1=query_c1.reshape(batch_size, (num_clips-1), -1, query_c1.shape[-2], query_c1.shape[-1])
+        # # query_c1=query_c1.reshape(batch_size, (num_clips-1), -1, query_c1.shape[-2], query_c1.shape[-1])
 
-        # query_c2=query_c2.reshape(batch_size, (num_clips-1), -1, query_c2.shape[-2], query_c2.shape[-1])
-        # query_c3=query_c3.reshape(batch_size, (num_clips-1), -1, query_c3.shape[-2], query_c3.shape[-1])
+        # # query_c2=query_c2.reshape(batch_size, (num_clips-1), -1, query_c2.shape[-2], query_c2.shape[-1])
+        # # query_c3=query_c3.reshape(batch_size, (num_clips-1), -1, query_c3.shape[-2], query_c3.shape[-1])
         
-        # query_c4=query_c4.reshape(batch_size, (num_clips-1), -1, query_c4.shape[-2], query_c4.shape[-1])
+        # # query_c4=query_c4.reshape(batch_size, (num_clips-1), -1, query_c4.shape[-2], query_c4.shape[-1])
 
         query_frame=[query_c1, query_c2, query_c3, query_c4]
 
-        # print('a',query_c4.shape)
-        # torch.Size([1, 3, 512, 15, 15])
-        # a=input()
+        # # print('a',query_c4.shape)
+        # # torch.Size([1, 3, 512, 15, 15])
+        # # a=input()
 
         supp_frame=[c1[:,-1:], c2[:,-1:], c3[:,-1:], c4[:,-1:]]
-        # supp_frame=[c1[-batch_size:].unsqueeze(1), c2[-batch_size:].unsqueeze(1), c3[-batch_size:].unsqueeze(1), c4[-batch_size:].unsqueeze(1)]
-        # print('check1',[i.shape for i in query_frame])
-        # print('check2',[i.shape for i in supp_frame])
-        # check1 [torch.Size([1, 3, 64, 120, 216]), torch.Size([1, 3, 128, 60, 108]), torch.Size([1, 3, 320, 30, 54]), torch.Size([1, 3, 512, 15, 27])]
-        # check2 [torch.Size([1, 1, 64, 120, 216]), torch.Size([1, 1, 128, 60, 108]), torch.Size([1, 1, 320, 30, 54]), torch.Size([1, 1, 512, 15, 27])]
+        # # supp_frame=[c1[-batch_size:].unsqueeze(1), c2[-batch_size:].unsqueeze(1), c3[-batch_size:].unsqueeze(1), c4[-batch_size:].unsqueeze(1)]
+        # # print('check1',[i.shape for i in query_frame])
+        # # print('check2',[i.shape for i in supp_frame])
+        # # check1 [torch.Size([1, 3, 64, 120, 216]), torch.Size([1, 3, 128, 60, 108]), torch.Size([1, 3, 320, 30, 54]), torch.Size([1, 3, 512, 15, 27])]
+        # # check2 [torch.Size([1, 1, 64, 120, 216]), torch.Size([1, 1, 128, 60, 108]), torch.Size([1, 1, 320, 30, 54]), torch.Size([1, 1, 512, 15, 27])]
         
 
         final_feature = self.hypercorre_module(query_frame,supp_frame)  
+        
+        
+        final_feature.insert(0,save_x_1)
+        
+        
+        final_feature_c1 = [i[0] for i in final_feature]
+        final_feature_c2 = [i[1] for i in final_feature]
+        final_feature_c3 = [i[2] for i in final_feature]
+        final_feature_c4 = [i[3] for i in final_feature]
 
-        supp_feats = final_feature
+        feature_cat = [final_feature_c1,final_feature_c2,final_feature_c3,final_feature_c4]
+        # supp_feats = final_feature
 
-        # atten=self.hypercorre_module(query_frame, supp_frame)
-        # atten=F.softmax(atten,dim=-1)
+        # # atten=self.hypercorre_module(query_frame, supp_frame)
+        # # atten=F.softmax(atten,dim=-1)
 
-        #(B,N,-1,C)
-        # print("atten shape",atten.shape)
-        # shape torch.Size([1, 3, 3600, 256])
+        # #(B,N,-1,C)
+        # # print("atten shape",atten.shape)
+        # # shape torch.Size([1, 3, 3600, 256])
 
 
-        # pooling_c1 = self.pooling_mhsa_c1(c1[:,:-1],[8,16,24,32])
-        # pooling_c2 = self.pooling_mhsa_c2(c2[:,:-1],[4,8,12,16])
-        # pooling_c3 = self.pooling_mhsa_c3(c3[:,:-1],[2,4,6,8])  
-        # pooling_c4 = self.pooling_mhsa_c4(c4[:,:-1],[1,2,3,4])  #<----
+        # # pooling_c1 = self.pooling_mhsa_c1(c1[:,:-1],[8,16,24,32])
+        # # pooling_c2 = self.pooling_mhsa_c2(c2[:,:-1],[4,8,12,16])
+        # # pooling_c3 = self.pooling_mhsa_c3(c3[:,:-1],[2,4,6,8])  
+        # # pooling_c4 = self.pooling_mhsa_c4(c4[:,:-1],[1,2,3,4])  #<----
 
-        # print("c1 c2",c1[:,:-1].shape,c2[:,:-1].shape,c3[:,:-1].shape,c4[:,:-1].shape)
-        # torch.Size([1, 3, 64, 120, 120]) torch.Size([1, 3, 128, 60, 60]) torch.Size([1, 3, 320, 30, 30]) torch.Size([1, 3, 512, 15, 15])
+        # # print("c1 c2",c1[:,:-1].shape,c2[:,:-1].shape,c3[:,:-1].shape,c4[:,:-1].shape)
+        # # torch.Size([1, 3, 64, 120, 120]) torch.Size([1, 3, 128, 60, 60]) torch.Size([1, 3, 320, 30, 30]) torch.Size([1, 3, 512, 15, 15])
 
-        # print("pooling",pooling_c1.shape,pooling_c2.shape,pooling_c3.shape,pooling_c4.shape)
-        # torch.Size([1, 3, 256, 64]) torch.Size([1, 3, 256, 128]) torch.Size([1, 3, 256, 320]) torch.Size([1, 3, 256, 512])
+        # # print("pooling",pooling_c1.shape,pooling_c2.shape,pooling_c3.shape,pooling_c4.shape)
+        # # torch.Size([1, 3, 256, 64]) torch.Size([1, 3, 256, 128]) torch.Size([1, 3, 256, 320]) torch.Size([1, 3, 256, 512])
 
-        # [torch.Size([2, 1, 64, 120, 120]), torch.Size([2, 1, 128, 60, 60]), torch.Size([2, 1, 320, 30, 30]), torch.Size([2, 1, 512, 15, 15])]
+        # # [torch.Size([2, 1, 64, 120, 120]), torch.Size([2, 1, 128, 60, 60]), torch.Size([2, 1, 320, 30, 30]), torch.Size([2, 1, 512, 15, 15])]
 
-        # pooling_all_scale = torch.cat((pooling_c1,pooling_c2,pooling_c3,pooling_c4),dim=3) # B,N,-1,4C
+        # # pooling_all_scale = torch.cat((pooling_c1,pooling_c2,pooling_c3,pooling_c4),dim=3) # B,N,-1,4C
 
-        # print('scale',pooling_all_scale.shape)
-        # torch.Size([1, 3, 256, 1024])
+        # # print('scale',pooling_all_scale.shape)
+        # # torch.Size([1, 3, 256, 1024])
 
-        # down_pooling_all_scale = self.pooling_linear(pooling_all_scale) #B,N,-1,C --- 1,4,130,256
+        # # down_pooling_all_scale = self.pooling_linear(pooling_all_scale) #B,N,-1,C --- 1,4,130,256
 
-        # down_pooling_all_scale = down_pooling_all_scale.reshape(batch_size,num_clips-1,-1,self.embeding)
+        # # down_pooling_all_scale = down_pooling_all_scale.reshape(batch_size,num_clips-1,-1,self.embeding)
 
-        # down_pooling_all_scale = down_pooling_all_scale.transpose(-1,-2)
+        # # down_pooling_all_scale = down_pooling_all_scale.transpose(-1,-2)
         
 
-        h2=int(h/2)
-        w2=int(w/2)
-        # # h3,w3=shape_c3[-2], shape_c3[-1]
-        _c2 = resize(_c, size=(h2,w2),mode='bilinear',align_corners=False)
+        # h2=int(h/2)
+        # w2=int(w/2)
+        # # # h3,w3=shape_c3[-2], shape_c3[-1]
+        # _c2 = resize(_c, size=(h2,w2),mode='bilinear',align_corners=False)
         
-        # print('c21',_c2.shape,batch_size,num_clips,h2,w2)
-        # c21 torch.Size([4, 256, 60, 60]) 1 4 60 60
+        # # print('c21',_c2.shape,batch_size,num_clips,h2,w2)
+        # # c21 torch.Size([4, 256, 60, 60]) 1 4 60 60
         
-        _c2_split=_c2.reshape(batch_size, num_clips, -1, h2, w2)
+        # _c2_split=_c2.reshape(batch_size, num_clips, -1, h2, w2)
         
 
-        # # _c_further=_c2[:,:-1].reshape(batch_size, num_clips-1, -1, h3*w3)
-        # _c3=self.sr1_feat(_c2)
-        # _c3=_c3.reshape(batch_size, num_clips, -1, _c3.shape[-2]*_c3.shape[-1]).transpose(-2,-1)
-        # # _c_further=_c3[:,:-1].reshape(batch_size, num_clips-1, _c2.shape[-2], _c2.shape[-1], -1)    ## batch_size, num_clips-1, _c2.shape[-2], _c2.shape[-1], c
-        # _c_further=_c3[:,:-1]        ## batch_size, num_clips-1, _c2.shape[-2]*_c2.shape[-1], c
-        # # print(_c_further.shape, topk_mask.shape, torch.unique(topk_mask.sum(2)))
-        # _c_further=_c_further[topk_mask].reshape(batch_size,num_clips-1,-1,_c_further.shape[-1])    ## batch_size, num_clips-1, s, c
-        # supp_feats=torch.matmul(atten,_c_further)#qk*v
+        # # # _c_further=_c2[:,:-1].reshape(batch_size, num_clips-1, -1, h3*w3)
+        # # _c3=self.sr1_feat(_c2)
+        # # _c3=_c3.reshape(batch_size, num_clips, -1, _c3.shape[-2]*_c3.shape[-1]).transpose(-2,-1)
+        # # # _c_further=_c3[:,:-1].reshape(batch_size, num_clips-1, _c2.shape[-2], _c2.shape[-1], -1)    ## batch_size, num_clips-1, _c2.shape[-2], _c2.shape[-1], c
+        # # _c_further=_c3[:,:-1]        ## batch_size, num_clips-1, _c2.shape[-2]*_c2.shape[-1], c
+        # # # print(_c_further.shape, topk_mask.shape, torch.unique(topk_mask.sum(2)))
+        # # _c_further=_c_further[topk_mask].reshape(batch_size,num_clips-1,-1,_c_further.shape[-1])    ## batch_size, num_clips-1, s, c
+        # # supp_feats=torch.matmul(atten,_c_further)#qk*v
 
-        # from here !!!!!!
+        # # from here !!!!!!
 
-        # supp_feats=supp_feats.reshape(batch_size, (num_clips-1), self.embeding, -1)
+        # # supp_feats=supp_feats.reshape(batch_size, (num_clips-1), self.embeding, -1)
 
-        # for i in range(0,4):
-        #     supp_feats[i]=supp_feats[i].transpose(-2,-1).reshape(batch_size,-1,self.embeding,h2,w2)
+        # # for i in range(0,4):
+        # #     supp_feats[i]=supp_feats[i].transpose(-2,-1).reshape(batch_size,-1,self.embeding,h2,w2)
 
-        supp_feats = [ supp.transpose(-2,-1).reshape(batch_size,-1, self.embeding, h2,w2) for supp in supp_feats ]
+        # supp_feats = [ supp.transpose(-2,-1).reshape(batch_size,-1, self.embeding, h2,w2) for supp in supp_feats ]
         
-        # su = [i.squeeze(1) for i in supp_feats]
-        # su.insert(0,_c2_split[:,0])
-        # su[0] = self.linear1(su[0])
-        # su[1] = self.linear2(su[1])
-        # su[2] = self.linear3(su[2])
-        # su[3] = self.linear4(su[3])
-        # supp_feats_f = torch.cat(su,dim=0)
+        # # su = [i.squeeze(1) for i in supp_feats]
+        # # su.insert(0,_c2_split[:,0])
+        # # su[0] = self.linear1(su[0])
+        # # su[1] = self.linear2(su[1])
+        # # su[2] = self.linear3(su[2])
+        # # su[3] = self.linear4(su[3])
+        # # supp_feats_f = torch.cat(su,dim=0)
         
-        new_supp =  []
-        for i in range(0,3):
-            new_supp.append(torch.cat([supp_feats[i],_c2_split[:,i+1:i+2]],dim=2))
-        supp_feats = new_supp
-        supp_feats.insert(0,_c2_split[:,0])
-        supp_feats=[ii.squeeze(1) for ii in supp_feats]
-        supp_feats[0] = self.linearconv1(supp_feats[0]) 
+        # new_supp =  []
+        # for i in range(0,3):
+        #     new_supp.append(torch.cat([supp_feats[i],_c2_split[:,i+1:i+2]],dim=2))
+        # supp_feats = new_supp
+        # supp_feats.insert(0,_c2_split[:,0])
+        # supp_feats=[ii.squeeze(1) for ii in supp_feats]
+        # supp_feats[0] = self.linearconv1(supp_feats[0]) 
         # outs_f = torch.cat(outs)
 
         # ends here !!!!!!
@@ -467,11 +485,9 @@ class SegFormerHead_ZeroShot(BaseDecodeHead_clips):
         
         # print(type(save_x),len(save_x),save_x[0].shape)
         
-        mask_feature,transformer_encoder_feature = self.pixel_decoder(save_x)
+        # mask_feature,transformer_encoder_feature = self.pixel_decoder(save_x)
         
-        # print("hh",mask_feature==None,transformer_encoder_feature==None)
-        
-        prediction =self.predictor(_c,mask_feature)
+        prediction =self.predictor(img,feature_cat)
 
         if not self.training:
             mask_cls_results = prediction["pred_logits"]
@@ -503,9 +519,10 @@ class SegFormerHead_ZeroShot(BaseDecodeHead_clips):
                 # exit()
                 if not self.sem_seg_postprocess_before_inference:
                     r = sem_seg_postprocess(r, image_size, height, width)
+                
                 processed_results.append({"sem_seg": r})
                 
-            res = torch.tensor(processed_results[0]['sem_seg']).unsqueeze(0)
+            res = torch.tensor(processed_results[-1]['sem_seg']).unsqueeze(0)
             
             # print("res",res.shape)
             # exit()

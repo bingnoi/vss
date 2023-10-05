@@ -188,6 +188,7 @@ class  TransformerZeroshotPredictor(nn.Module):
             bg_score = logit_scale * x_cls @ self.bg_feature.t()
             outputs_class = torch.cat((cls_score, bg_score), -1)
             # print("qqq",outputs_class.shape)
+            # outputs_class = self.class_embed(hs)
             out = {"pred_logits": outputs_class[-1]}
         else:
             out = {}

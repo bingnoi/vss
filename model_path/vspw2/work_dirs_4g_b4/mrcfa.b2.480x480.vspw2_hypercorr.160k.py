@@ -37,7 +37,6 @@ train_pipeline = [
         process_clips=True),
     dict(type='RandomCrop_clips', crop_size=(480, 480), cat_max_ratio=0.75),
     dict(type='RandomFlip_clips', prob=0.5),
-    dict(type='PhotoMetricDistortion_clips'),
     dict(
         type='Normalize_clips',
         mean=[123.675, 116.28, 103.53],
@@ -90,7 +89,6 @@ data = dict(
                     crop_size=(480, 480),
                     cat_max_ratio=0.75),
                 dict(type='RandomFlip_clips', prob=0.5),
-                dict(type='PhotoMetricDistortion_clips'),
                 dict(
                     type='Normalize_clips',
                     mean=[123.675, 116.28, 103.53],
@@ -179,17 +177,18 @@ optimizer = dict(
             pos_block=dict(decay_mult=0.0),
             norm=dict(decay_mult=0.0),
             head=dict(lr_mult=10.0))))
-optimizer_config = dict()
+optimizer_config = dict(
+    type='GradientCumulativeOptimizerHook', cumulative_iters=32)
 lr_config = dict(
     policy='poly',
     warmup='linear',
     warmup_iters=1500,
     warmup_ratio=1e-06,
-    power=1.0,
+    power=0.9,
     min_lr=0.0,
     by_epoch=False)
 runner = dict(type='IterBasedRunner', max_iters=160000)
 checkpoint_config = dict(by_epoch=False, interval=4000)
-evaluation = dict(interval=160000, metric='mIoU')
-work_dir = 'model_path/vspw2/work_dirs_4g_b4/'
+evaluation = dict(interval=100000, metric='mIoU')
+work_dir = 'model_path/vspw2/work_dirs_4g_b4'
 gpu_ids = range(0, 1)

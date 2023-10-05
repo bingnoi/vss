@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 
 import sys
-sys.path.append("/datadisk/lixinhao/vss")
+sys.path.append("/home/lixinhao/vss")
 
 from mmseg.apis import inference_segmentor, init_segmentor, show_result_pyplot
 from mmseg.core.evaluation import get_palette
@@ -24,6 +24,8 @@ def main():
     model = init_segmentor(args.config, args.checkpoint, device=args.device)
     # test a single image
     result = inference_segmentor(model, args.img)
+    import numpy as np
+    print(np.unique(result))
     # show the results
     show_result_pyplot(model, args.img, result, get_palette(args.palette))
 
