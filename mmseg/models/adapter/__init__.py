@@ -11,18 +11,19 @@ from .adapter import ClipAdapter, MaskFormerClipAdapter, PerPixelClipAdapter
 
 
 def build_prompt_learner(cfg):
-    if cfg.PROMPT_LEARNER == "predefined":
+    print(cfg)
+    if cfg["PROMPT_LEARNER"] == "predefined":
         prompt_learner = PredefinedPromptExtractor(cfg.PREDEFINED_PROMPT_TEMPLATES)
-    elif cfg.PROMPT_LEARNER == "imagenet":
-        prompt_learner = ImageNetPromptExtractor()
-    elif cfg.PROMPT_LEARNER == "vild":
-        prompt_learner = VILDPromptExtractor()
-    elif cfg.PROMPT_LEARNER == "learnable":
+    # elif cfg.PROMPT_LEARNER == "imagenet":
+    #     prompt_learner = ImageNetPromptExtractor()
+    # elif cfg.PROMPT_LEARNER == "vild":
+    #     prompt_learner = VILDPromptExtractor()
+    elif cfg["PROMPT_LEARNER"] == "learnable":
         prompt_learner = LearnablePromptExtractor(
-            prompt_dim=cfg.PROMPT_DIM,
-            prompt_shape=cfg.PROMPT_SHAPE,
+            prompt_dim=cfg["PROMPT_DIM"],
+            prompt_shape=cfg["PROMPT_SHAPE"],
         )
-        if cfg.PROMPT_CHECKPOINT != "":
+        if cfg["PROMPT_CHECKPOINT"] != "":
             checkpoint = torch.load(cfg.PROMPT_CHECKPOINT, map_location="cpu")["model"]
             missing, unexpected = prompt_learner.load_state_dict(
                 {
@@ -54,6 +55,6 @@ def build_prompt_learner(cfg):
             )
     else:
         raise NotImplementedError(
-            "Prompt learner {} is not supported".format(cfg.PROMPT_LEARNER)
+            "Prompt learner {} is not supported".format(cfg["PROMPT_LEARNER"])
         )
     return prompt_learner

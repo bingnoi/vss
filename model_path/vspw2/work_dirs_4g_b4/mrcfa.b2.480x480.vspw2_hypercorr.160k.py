@@ -166,7 +166,7 @@ log_config = dict(
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 load_from = None
-resume_from = 'model_path/vspw2/work_dirs_4g_b4/iter_90000.pth'
+resume_from = None
 workflow = [('train', 1)]
 cudnn_benchmark = True
 optimizer = dict(

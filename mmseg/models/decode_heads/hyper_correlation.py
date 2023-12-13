@@ -7,12 +7,6 @@ from einops.layers.torch import Rearrange
 
 from timm.layers import PatchEmbed, Mlp, DropPath, to_2tuple, to_ntuple, trunc_normal_, _assert
 
-from scipy.optimize import linear_sum_assignment
-
-#multi-scale fusion
-#multi-frame fusion
-#correlation refine
-
 def window_partition(x, window_size: int):
     """
     Args:
@@ -72,10 +66,6 @@ class WindowAttention(nn.Module):
         attn_dim = head_dim * num_heads
         self.scale = head_dim ** -0.5
 
-        
-        self.q1 = dim + appearance_guidance_dim
-        self.q2 = attn_dim
-
         self.q = nn.Linear(dim + appearance_guidance_dim, attn_dim, bias=qkv_bias)
         self.k = nn.Linear(dim + appearance_guidance_dim, attn_dim, bias=qkv_bias)
         self.v = nn.Linear(dim, attn_dim, bias=qkv_bias)
@@ -93,13 +83,9 @@ class WindowAttention(nn.Module):
         """
         B_, N, C = x.shape
         
-        
-        # print('d2',x.shape,self.q1,self.q2)
         q = self.q(x).reshape(B_, N, self.num_heads, -1).permute(0, 2, 1, 3)
         k = self.k(x).reshape(B_, N, self.num_heads, -1).permute(0, 2, 1, 3)
         v = self.v(x[:, :, :self.dim]).reshape(B_, N, self.num_heads, -1).permute(0, 2, 1, 3)
-
-        print('q',q.shape,k.shape)
 
         q = q * self.scale
         attn = (q @ k.transpose(-2, -1))
@@ -114,11 +100,7 @@ class WindowAttention(nn.Module):
 
         attn = self.attn_drop(attn)
 
-        x = (attn @ v).transpose(1, 2)
-        print('x1',x.shape)
-        # torch.Size([1776, 144, 4, 20]) 4*444,144,4,20
-        x = x.reshape(B_, N, -1)
-        
+        x = (attn @ v).transpose(1, 2).reshape(B_, N, -1)
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
@@ -197,7 +179,6 @@ class SwinTransformerBlock(nn.Module):
         B, L, C = x.shape
         assert L == H * W, "input feature has wrong size"
 
-        print('3',x.shape,appearance_guidance.shape)
         shortcut = x
         x = self.norm1(x)
         x = x.view(B, H, W, C)
@@ -215,16 +196,12 @@ class SwinTransformerBlock(nn.Module):
         x_windows = window_partition(shifted_x, self.window_size)  # num_win*B, window_size, window_size, C
         x_windows = x_windows.view(-1, self.window_size * self.window_size, x_windows.shape[-1])  # num_win*B, window_size*window_size, C
 
-        print('4',x_windows.shape)
-        # exit()
         # W-MSA/SW-MSA
         attn_windows = self.attn(x_windows, mask=self.attn_mask)  # num_win*B, window_size*window_size, C
 
         # merge windows
         attn_windows = attn_windows.view(-1, self.window_size, self.window_size, C)
         shifted_x = window_reverse(attn_windows, self.window_size, H, W)  # B H' W' C
-        
-        print('5',shifted_x.shape)
 
         # reverse cyclic shift
         if self.shift_size > 0:
@@ -234,13 +211,8 @@ class SwinTransformerBlock(nn.Module):
         x = x.view(B, H * W, C)
 
         # FFN
-        # print('s',shortcut.shape,x.shape)
-        # 5 torch.Size([444, 24, 24, 80])
-        # s torch.Size([444, 576, 80]) torch.Size([444, 576, 80])
         x = shortcut + self.drop_path(x)
         x = x + self.drop_path(self.mlp(self.norm2(x)))
-        
-        exit()
 
         return x
 
@@ -401,6 +373,10 @@ class ClassTransformerLayer(nn.Module):
             x: B, C, T, H, W
             guidance: B, T, C
         """
+        # print(x.shape,guidance.shape)
+        # torch.Size([4, 80, 111, 24, 24]) torch.Size([4, 111, 128])
+        # exit()
+        
         B, _, _, H, W = x.size()
         x_pool = self.pool_features(x)
         *_, H_pool, W_pool = x_pool.size()
@@ -438,8 +414,8 @@ class ensemble(nn.Module):
         self.text_block = ClassTransformerLayer(hidden_dim, text_guidance_dim, nheads=nheads, attention_type=attention_type, pooling_size=pooling_size)
 
     def forward(self,x,img,text):
-        print('2',x.shape,img.shape,text.shape)
-        x = self.image_block(x,img)
+        #print('2',x.shape,img.shape,text.shape)
+        # x = self.image_block(x,img)
         x = self.text_block(x,text)
         return x
 
@@ -476,7 +452,7 @@ class Up(nn.Module):
         if guidance is not None:
             T = x.size(0) // guidance.size(0)
             guidance = repeat(guidance, "B C H W -> (B T) C H W", T=T)
-            # print('llll',x.shape,guidance.shape)
+            # #print('llll',x.shape,guidance.shape)
             x = torch.cat([x, guidance], dim=1)
         return self.conv(x)
 
@@ -491,7 +467,7 @@ class decoder(nn.Module):
     def forward(self, x,guidance=None):
         B = x.shape[0]
         corr_embed = rearrange(x, 'B C T H W -> (B T) C H W')
-        # print('q',corr_embed.shape)
+        # #print('q',corr_embed.shape)
         corr_embed = self.decoder1(corr_embed,guidance)
         corr_embed = self.head(corr_embed)
         corr_embed = rearrange(corr_embed, '(B T) () H W -> B T H W', B=B)
@@ -568,14 +544,14 @@ class Corr(nn.Module):
     def correlation(self, img_feats, text_feats):
         img_feats = F.normalize(img_feats, dim=1) # B C H W
         text_feats = F.normalize(text_feats, dim=-1) # B T P C
-        # print('qq',img_feats.shape,text_feats.shape) 
+        # #print('qq',img_feats.shape,text_feats.shape) 
         # 1,256,60,60 * 1,111,80,256 = 1,80,111,60,60
         corr = torch.einsum('bchw, btpc -> bpthw', img_feats, text_feats)
         return corr
     
     def corr_embed(self, x):
         B = x.shape[0]
-        # print('x',x.shape)
+        # #print('x',x.shape)
         corr_embed = rearrange(x, 'B P T H W -> (B T) P H W') #111 80 60 60
         
         corr_embed = self.conv1(corr_embed) #111 128 60 60
@@ -585,16 +561,16 @@ class Corr(nn.Module):
     def fusion(self,x):
         B = x.shape[0]
         for i in range(B-1,1,-1):
-            # print(x[i].shape,x[i-1].shape)
+            # #print(x[i].shape,x[i-1].shape)
             q = rearrange(x[i],'P T H W -> P T (H W)')
             k = rearrange(x[i-1],'P T H W -> P T (H W)')
             
             # q = x[i].contiguous().reshape(x[i].shape[0],x[i].shape[1],-1)
             # k = x[i-1].contiguous().reshape(x[i-1].shape[0],x[i-1].shape[1],-1)
             
-            # print('atten1',q.shape,k.shape)
+            # #print('atten1',q.shape,k.shape)
             atten = torch.matmul(q,k.transpose(-1,-2))
-            # print('atten',atten.shape,k.shape)
+            # #print('atten',atten.shape,k.shape)
             fused = torch.matmul(atten,k).squeeze(0)
             x[i] = rearrange(fused,'P T (H W) -> P T H W',H=24)
             
@@ -604,7 +580,7 @@ class Corr(nn.Module):
     # def conv_decoder(self, x):
     #     B = x.shape[0]
     #     corr_embed = rearrange(x, 'B C T H W -> (B T) C H W')
-    #     print('q',corr_embed.shape)
+    #     #print('q',corr_embed.shape)
     #     corr_embed = self.decoder1(corr_embed)
     #     corr_embed = self.decoder2(corr_embed)
     #     corr_embed = self.head(corr_embed)
@@ -622,7 +598,7 @@ class Corr(nn.Module):
         
         # for i in range(self.num_feature_scale):
         #     for j in range(self.num_frames):
-        #         print(img[i][j].shape,text.shape)
+        #         #print(img[i][j].shape,text.shape)
         #         if i==0:
         #             correlation_c1.append(self.correlation(img[i][j],text[j,:]))
         #         elif i==1:
@@ -632,14 +608,14 @@ class Corr(nn.Module):
         #         elif i==3:
         #             correlation_c4.append(self.correlation(img[i][j],text[j,:]))
         
-        # print(img[0].unsqueeze(0).shape,text[0,:].shape)
+        # #print(img[0].unsqueeze(0).shape,text[0,:].shape)
         
         # for i in range(self.num_feature_scale):
-        #     # print(img[i].shape,text.shape)
+        #     # #print(img[i].shape,text.shape)
         #     if i==0:
         #         correlation_c1.append(self.corr_embed(self.correlation(img[i].unsqueeze(0),text[i,:])))
         
-        # print([i.shape for i in img],text.shape)
+        # #print([i.shape for i in img],text.shape)
         # torch.Size([5, 256, 48, 48]) torch.Size([5, 124, 80, 256])
         
         # img = self.fusion(img)
@@ -667,30 +643,30 @@ class Corr(nn.Module):
         proj_fuse_img = self.proj_img_1(fuse_img)
         proj_fuse_img =F.interpolate(proj_fuse_img,size=(72,72),mode='bilinear',align_corners=False)
         
-        # print('ppp',proj_fuse_img.shape,proj_c4.shape)
+        # #print('ppp',proj_fuse_img.shape,proj_c4.shape)
         
         # corr_embeds = torch.cat([correlation_c1[0]],dim=0)
         # res_corr_map = []
         
         # correlation_c1[0].permute(2,3,)
-        # print(corr_embeds.shape,text.shape,correlation_c1[0].shape)
+        # #print(corr_embeds.shape,text.shape,correlation_c1[0].shape)
         # exit()
         
         # b,h*w,c * b,c,h*w = b,h*w,h*w b,h*w,c = b,h*w,c
         # b,c,h,w * b,t,c = b,c,t,h,w (t,h*w,c)*(t,c) = t,h*w,c
         # corr_emd_map = rearrange(corr_emd_map,'B C T H W -> (H W) (B T) C')
         
-        # print(corr_emd_map.shape,text.shape,)
+        # #print(corr_emd_map.shape,text.shape,)
         
         # supp_feats_1 = torch.matmul(correlation_c1[0],text[0,:])
         # supp_feats_1 = torch.einsum('b t c, t c -> b t c',corr_emd_map,text)
         # supp_feats_1 = rearrange(supp_feats_1,'(H W) T C -> C T H W',H=h).unsqueeze(0)
         
-        print('1',corr_emd_map.shape,proj_c4.shape,text.shape)
+        #print('1',corr_emd_map.shape,proj_c4.shape,text.shape)
         for layer in self.layers:
             corr_embed = layer(corr_emd_map,proj_c4,text)
             
-        # print('cor',corr_embed.shape)
+        # #print('cor',corr_embed.shape)
         # corr_embed = self.fusion(corr_embed)
         
         logit = F.interpolate(self.decodeh1(corr_embed,proj_fuse_img),size=(120,120),mode='bilinear',align_corners=False) 
@@ -705,7 +681,7 @@ class Corr(nn.Module):
         # logit4 = F.interpolate(self.decodeh4(correlation_map[3]),size=(120,120),mode='bilinear',align_corners=False)
         
         # logit = torch.cat([logit1,logit2,logit3,logit4],dim=0)
-        # # print(img.shape,text.shape,corr.shape,corr_embed.shape,logit.shape)
+        # # #print(img.shape,text.shape,corr.shape,corr_embed.shape,logit.shape)
 
         return logit
         
@@ -721,7 +697,7 @@ class Corr(nn.Module):
             
         #     # for i in range(self.num_feature_scale):
         #     #     for j in range(self.num_frames):
-        #     #         print(img[i][j].shape,text.shape)
+        #     #         #print(img[i][j].shape,text.shape)
         #     #         if i==0:
         #     #             correlation_c1.append(self.correlation(img[i][j],text[j,:]))
         #     #         elif i==1:
@@ -731,10 +707,10 @@ class Corr(nn.Module):
         #     #         elif i==3:
         #     #             correlation_c4.append(self.correlation(img[i][j],text[j,:]))
             
-        #     # print(img[0].shape,text[0,:].shape)
+        #     # #print(img[0].shape,text[0,:].shape)
             
         #     for i in range(self.num_feature_scale):
-        #         # print(img[i].shape,text.shape)
+        #         # #print(img[i].shape,text.shape)
         #         if i==0:
         #             correlation_c1.append(self.corr_embed(self.correlation(img[i],text[i,:])))
         #         elif i==1:
@@ -754,7 +730,7 @@ class Corr(nn.Module):
         #     res_corr_map = []
             
         #     # correlation_c1[0].permute(2,3,)
-        #     # print(corr_embeds.shape,text.shape,correlation_c1[0].shape)
+        #     # #print(corr_embeds.shape,text.shape,correlation_c1[0].shape)
         #     # exit()
             
         #     # b,h*w,c * b,c,h*w = b,h*w,h*w b,h*w,c = b,h*w,c
@@ -764,7 +740,7 @@ class Corr(nn.Module):
         #     correlation_c3[0] = rearrange(correlation_c3[0],'B C T H W -> (H W) (B T) C')
         #     correlation_c4[0] = rearrange(correlation_c4[0],'B C T H W -> (H W) (B T) C')
             
-        #     # print(correlation_c1[0].shape,text[0,:].shape,)
+        #     # #print(correlation_c1[0].shape,text[0,:].shape,)
         #     # supp_feats_1 = torch.matmul(correlation_c1[0],text[0,:])
             
         #     supp_feats_1 = torch.einsum('b t c, t c -> b t c',correlation_c1[0],text[0,:])
@@ -772,7 +748,7 @@ class Corr(nn.Module):
         #     supp_feats_3 = torch.einsum('b t c, t c -> b t c',correlation_c3[0],text[0,:])
         #     supp_feats_4 = torch.einsum('b t c, t c -> b t c',correlation_c4[0],text[0,:])
             
-        #     # print(supp_feats_1.shape)
+        #     # #print(supp_feats_1.shape)
             
         #     supp_feats_1 = rearrange(supp_feats_1,'(H W) T C -> C T H W',H=h).unsqueeze(0)
         #     supp_feats_2 = rearrange(supp_feats_2,'(H W) T C -> C T H W',H=h).unsqueeze(0)
@@ -796,6 +772,6 @@ class Corr(nn.Module):
         #     # logit4 = F.interpolate(self.decodeh4(correlation_map[3]),size=(120,120),mode='bilinear',align_corners=False)
             
         #     # logit = torch.cat([logit1,logit2,logit3,logit4],dim=0)
-        #     # # print(img.shape,text.shape,corr.shape,corr_embed.shape,logit.shape)
+        #     # # #print(img.shape,text.shape,corr.shape,corr_embed.shape,logit.shape)
 
         #     return logit

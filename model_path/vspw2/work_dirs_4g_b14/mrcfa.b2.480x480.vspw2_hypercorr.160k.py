@@ -2,10 +2,10 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 find_unused_parameters = True
 model = dict(
     type='EncoderDecoder_clips',
-    pretrained='/home/lixinhao/original/mit_b2.pth',
+    pretrained='/home/lixinhao/vss/mit_b2.pth',
     backbone=dict(type='mit_b2', style='pytorch'),
     decode_head=dict(
-        type='SegFormerHead_clips',
+        type='SegFormerHead_CAT',
         in_channels=[64, 128, 320, 512],
         in_index=[0, 1, 2, 3],
         feature_strides=[4, 8, 16, 32],
@@ -17,14 +17,13 @@ model = dict(
         decoder_params=dict(embed_dim=256),
         loss_decode=dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-        num_infer=5,
-        num_clips=4,
+        num_clips=5,
         hypercorre=True,
         backbone='b2'),
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
-dataset_type = 'VSPWDataset2'
-data_root = 'data/vspw/VSPW_480p'
+dataset_type = 'VSPWDataset4'
+data_root = '/home/lixinhao/vss/data/vspw/VSPW_480p'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 crop_size = (480, 480)
@@ -68,13 +67,13 @@ test_pipeline = [
 ]
 data = dict(
     samples_per_gpu=1,
-    workers_per_gpu=3,
+    workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
         times=50,
         dataset=dict(
-            type='VSPWDataset2',
-            data_root='data/vspw/VSPW_480p',
+            type='VSPWDataset4',
+            data_root='/home/lixinhao/vss/data/vspw/VSPW_480p',
             img_dir='images/training',
             ann_dir='annotations/training',
             split='train',
@@ -107,8 +106,8 @@ data = dict(
             ],
             dilation=[-9, -6, -3])),
     val=dict(
-        type='VSPWDataset2',
-        data_root='data/vspw/VSPW_480p',
+        type='VSPWDataset4',
+        data_root='/home/lixinhao/vss/data/vspw/VSPW_480p',
         img_dir='images/validation',
         ann_dir='annotations/validation',
         split='val',
@@ -135,8 +134,8 @@ data = dict(
         ],
         dilation=[-9, -6, -3]),
     test=dict(
-        type='VSPWDataset2',
-        data_root='data/vspw/VSPW_480p',
+        type='VSPWDataset4',
+        data_root='/home/lixinhao/vss/data/vspw/VSPW_480p',
         img_dir='images/validation',
         ann_dir='annotations/validation',
         split='val',
@@ -172,7 +171,7 @@ workflow = [('train', 1)]
 cudnn_benchmark = True
 optimizer = dict(
     type='AdamW',
-    lr=6e-06,
+    lr=3e-06,
     betas=(0.9, 0.999),
     weight_decay=0.01,
     paramwise_cfg=dict(
@@ -180,17 +179,18 @@ optimizer = dict(
             pos_block=dict(decay_mult=0.0),
             norm=dict(decay_mult=0.0),
             head=dict(lr_mult=10.0))))
-optimizer_config = dict()
+optimizer_config = dict(
+    type='GradientCumulativeOptimizerHook', cumulative_iters=4)
 lr_config = dict(
     policy='poly',
     warmup='linear',
     warmup_iters=1500,
     warmup_ratio=1e-06,
-    power=1.0,
+    power=0.9,
     min_lr=0.0,
     by_epoch=False)
-runner = dict(type='IterBasedRunner', max_iters=160000)
-checkpoint_config = dict(by_epoch=False, interval=4000)
-evaluation = dict(interval=160000, metric='mIoU')
-work_dir = 'model_path/vspw2/work_dirs_4g_b14'
+runner = dict(type='IterBasedRunner', max_iters=100000)
+checkpoint_config = dict(by_epoch=False, interval=10000)
+evaluation = dict(interval=100000, metric='mIoU')
+work_dir = 'model_path/vspw2/work_dirs_4g_b14/'
 gpu_ids = range(0, 1)

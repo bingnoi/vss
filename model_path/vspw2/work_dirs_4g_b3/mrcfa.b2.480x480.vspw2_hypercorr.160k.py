@@ -2,7 +2,7 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 find_unused_parameters = True
 model = dict(
     type='EncoderDecoder_clips',
-    pretrained='/home/lixinhao/original/mit_b2.pth',
+    pretrained='/home/lixinhao/vss/mit_b2.pth',
     backbone=dict(type='mit_b2', style='pytorch'),
     decode_head=dict(
         type='SegFormerHead_CAT',
@@ -67,7 +67,7 @@ test_pipeline = [
 ]
 data = dict(
     samples_per_gpu=1,
-    workers_per_gpu=0,
+    workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
         times=50,
@@ -192,5 +192,5 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=100000)
 checkpoint_config = dict(by_epoch=False, interval=10000)
 evaluation = dict(interval=100000, metric='mIoU')
-work_dir = 'model_path/vspw2/work_dirs_4g_b3'
+work_dir = 'model_path/vspw2/work_dirs_4g_b3/'
 gpu_ids = range(0, 1)

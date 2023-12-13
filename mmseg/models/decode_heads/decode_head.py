@@ -15,6 +15,7 @@ import numpy as np
 
 from .criterion import SetCriterion
 from .matcher import HungarianMatcher
+from einops import repeat
 
 class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
     """Base class for BaseDecodeHead.
@@ -662,7 +663,13 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                 seg_label_last3frame = seg_label[:,:-1].reshape(batch_size*(num_clips_last-1),-1,h,w)
                 seg_label_lastframe = seg_label[:,-1:].reshape(batch_size,-1,h,w)
 
-
+            elif self.self_ensemble2 and seg_logit.shape[1]==5 and seg_label.shape[1]==1 :
+                seg_logit_ori=seg_logit[:,-2:]
+                batch_size, n, _, h ,w=seg_logit_ori.shape
+                seg_logit_ori=seg_logit_ori.reshape(batch_size,n,-1,h,w)
+                batch_size, num_clips, chan, h ,w=seg_label.shape
+                seg_label_ori=seg_label.reshape(batch_size*num_clips,-1,h,w)
+                seg_label_ori=seg_label_ori.repeat(n,1,1,1)
             else:
                 assert False, "parameters not correct"            
 
@@ -671,8 +678,9 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         # print('m',seg_label_ori.shape, seg_label_lastframe.shape)
 
         # 一个是x,剩下那个是out1...4
+        # print(seg_logit_ori.shape,seg_label.shape)
         seg_logit_ori = resize(
-            input=seg_logit_ori,
+            input=seg_logit_ori.squeeze(0),
             size=seg_label.shape[3:],
             mode='bilinear',
             align_corners=self.align_corners)

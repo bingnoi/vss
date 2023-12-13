@@ -222,6 +222,7 @@ class BaseSegmentor(nn.Module):
     def show_result(self,
                     img,
                     result,
+                    labelname,
                     palette=None,
                     win_name='',
                     show=False,
@@ -256,13 +257,47 @@ class BaseSegmentor(nn.Module):
                     0, 255, size=(len(self.CLASSES), 3))
             else:
                 palette = self.PALETTE
-        palette = np.array(palette)
+        palette = np.array(palette)[:111]
+        print(palette.shape[0],len(self.CLASSES))
         assert palette.shape[0] == len(self.CLASSES)
         assert palette.shape[1] == 3
         assert len(palette.shape) == 2
         color_seg = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
         for label, color in enumerate(palette):
             color_seg[seg == label, :] = color
+            
+        for i in np.unique(seg):
+            # 找到类别为 i 的区域
+            region = np.where(seg == i)
+            
+            # 计算区域的中心坐标
+            center_y = int(np.mean(region[0]))
+            center_x = int(np.mean(region[1]))
+
+            import cv2
+            # 在图像上添加文字标签
+            cv2.putText(color_seg, str(i)+" "+self.CLASSES[i], (center_x, center_y),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 4)
+        
+        def read_label_from_grayscale_image(image_path):
+            # 读取灰度图像
+            print(image_path)
+            gray_image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+
+            if gray_image is None:
+                print(f"Error: Unable to read image from {image_path}")
+                return None
+
+            # 将像素值作为标签
+            label_data = gray_image.astype(int)
+            
+            labels = np.unique(label_data)
+            
+            print([self.CLASSES[label] for label in labels if label<111])
+
+            return label_data
+        
+        print(read_label_from_grayscale_image(labelname))
         # convert to BGR
         color_seg = color_seg[..., ::-1]
 

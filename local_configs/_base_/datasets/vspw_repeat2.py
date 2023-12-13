@@ -1,5 +1,5 @@
 # dataset settings
-dataset_type = 'VSPWDataset3'
+dataset_type = 'VSPWDataset4'
 data_root = '/home/lixinhao/vss/data/vspw/VSPW_480p'
 # data_root = '/home/lixinhao/vss/data/test/vspw/VSPW_480p'
 img_norm_cfg = dict(

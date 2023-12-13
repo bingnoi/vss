@@ -390,8 +390,9 @@ class AlignedResize_clips(object):
 
     def _resize_img(self, results):
         """Resize images with ``results['scale']``."""
-        # results['img'] = [results['img']]
-        assert isinstance(results['img'], list)
+        if not isinstance(results['img'],list):
+            results['img'] = [results['img']]
+        # assert isinstance(results['img'], list)
         img_all=[]
         if self.keep_ratio:
             for im_one in results['img']:

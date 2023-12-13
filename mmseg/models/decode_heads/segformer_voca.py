@@ -31,6 +31,8 @@ from .cat_zeroshot_classifier import CatClassifier
 from .per_pixel import BasePixelDecoder
 from .hyper_correlation import Corr
 
+from einops import rearrange
+
 def sem_seg_postprocess(result, img_size, output_height, output_width):
     """
     Return semantic segmentation predictions in the original resolution.
@@ -140,7 +142,87 @@ class pooling_mhsa(nn.Module):
         
         return pools
         
+def label_to_onehot(gt, num_classes, ignore_index=-1):
+    '''
+    gt: ground truth with size (N, H, W)
+    num_classes: the number of classes of different label
+    '''
+    N, H, W = gt.size()
+    x = gt
+    x[x == ignore_index] = num_classes
+    # convert label into onehot format
+    onehot = torch.zeros(N, x.size(1), x.size(2), num_classes + 1).cuda()
+    onehot = onehot.scatter_(-1, x.unsqueeze(-1), 1)          
 
+    return onehot.permute(0, 3, 1, 2)        
+    
+class SpatialGather_Module(nn.Module):
+    """
+        Aggregate the context features according to the initial predicted probability distribution.
+        Employ the soft-weighted method to aggregate the context.
+    """
+    def __init__(self, cls_num=0, scale=1, use_gt=False):
+        super(SpatialGather_Module, self).__init__()
+        self.cls_num = cls_num
+        self.scale = scale
+        self.use_gt = use_gt
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, feats, probs, gt_probs=None):
+        if self.use_gt and gt_probs is not None:
+            gt_probs = label_to_onehot(gt_probs.squeeze(1).type(torch.cuda.LongTensor), probs.size(1))
+            batch_size, c, h, w = gt_probs.size(0), gt_probs.size(1), gt_probs.size(2), gt_probs.size(3)
+            gt_probs = gt_probs.view(batch_size, c, -1)
+            feats = feats.view(batch_size, feats.size(1), -1)
+            feats = feats.permute(0, 2, 1) # batch x hw x c 
+            gt_probs = F.normalize(gt_probs, p=1, dim=2)# batch x k x hw
+            ocr_context = torch.matmul(gt_probs, feats).permute(0, 2, 1).unsqueeze(3)# batch x k x c
+            return ocr_context               
+        else:
+            batch_size, c, h, w = probs.size(0), probs.size(1), probs.size(2), probs.size(3)
+            probs = probs.view(batch_size, c, -1)
+            feats = feats.view(batch_size, feats.size(1), -1)
+            feats = feats.permute(0, 2, 1) # batch x hw x c 
+            probs = F.softmax(self.scale * probs, dim=2)# batch x k x hw
+            ocr_context = torch.matmul(probs, feats).permute(0, 2, 1).unsqueeze(3)# batch x k x c
+            return ocr_context
+
+class MulitHeadAttention(nn.Module):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+
+        self.scale = qk_scale or head_dim ** -0.5
+
+        self.q_proj = nn.Linear(dim, dim, bias=qkv_bias)
+        self.k_proj = nn.Linear(dim, dim, bias=qkv_bias)
+        self.v_proj = nn.Linear(dim, dim, bias=qkv_bias)
+
+
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, q, k, v):
+        q = rearrange(q,'b c h w->b (h w) c')
+        k = rearrange(k,'b c h w->b (h w) c')
+        v = rearrange(v,'b c h w->b (h w) c')
+        # print(q.shape)
+        B, N, C = q.shape
+        B0, M0, C0 = k.shape
+        q = self.q_proj(q).reshape(B, N, self.num_heads, C // self.num_heads).permute(0,2,1,3)
+        k = self.k_proj(k).reshape(B0, M0, self.num_heads, C0 // self.num_heads).permute(0,2,1,3)
+        v = self.v_proj(v).reshape(B0, M0, self.num_heads, C0 // self.num_heads).permute(0,2,1,3)
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+        
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
 
 @HEADS.register_module()
 class SegFormerHead_CAT(BaseDecodeHead_clips):
@@ -223,7 +305,35 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
         self.ensembling = True
         self.ensembling_all_cls = True
         
-        self.pixel_decoder = BasePixelDecoder()
+        # self.pixel_decoder = BasePixelDecoder()
+        
+        self.linearc2 = nn.Linear(c2_in_channels,self.embeding)
+        self.corrconv1 = nn.Conv2d(self.embeding,self.embeding,kernel_size=(3,3))
+        self.corrconv2 = nn.Conv2d(self.embeding,self.embeding,kernel_size=(3,3))
+        self.actirelu = nn.ReLU()
+        
+        self.aux_head = nn.Sequential(
+            nn.Conv2d(self.embeding, self.embeding,
+                      kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(self.embeding),
+            nn.ReLU(inplace=False),
+            nn.Conv2d(self.embeding, 111,
+                      kernel_size=1, stride=1, padding=0, bias=True))
+        
+        self.dsn_head = nn.Sequential(
+            nn.Conv2d(self.embeding, 512, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Dropout2d(0.05),
+            nn.Conv2d(512,111, kernel_size=1, stride=1, padding=0, bias=True)
+            )
+        # self.conv_3x3 = nn.Sequential(
+        #     nn.Conv2d(in_channels[1], 512, kernel_size=3, stride=1, padding=1),
+        #     ModuleHelper.BNReLU(512, bn_type=self.configer.get('network', 'bn_type')),
+        # )
+        self.ocrn = SpatialGather_Module(111)
+        self.mul_attention = MulitHeadAttention(dim=self.embeding)
+        self.linear_ref = nn.Linear(1024,256)
         
         self.corr = Corr()
         
@@ -355,13 +465,33 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
         # start_time1=time.time()
         # shape_c1, shape_c2, shape_c3, shape_c4=c1.size()[2:], c2.size()[2:], c3.size()[2:], c4.size()[2:]
         
+        full_c1 = c1.reshape(batch_size*ratio, num_clips, -1, c1.shape[-2], c1.shape[-1])
+        full_c2 = c2.reshape(batch_size*ratio, num_clips, -1, c2.shape[-2], c2.shape[-1])
+        full_c3 = c3.reshape(batch_size*ratio, num_clips, -1, c3.shape[-2], c3.shape[-1])
+        full_c4 = c4.reshape(batch_size*ratio, num_clips, -1, c4.shape[-2], c4.shape[-1])
         
+        ref_c1 = full_c1[:,:1]
+        ref_c2 = full_c2[:,:1]
+        ref_c3 = full_c3[:,:1]
+        ref_c4 = full_c4[:,:1]
+        
+        ref_c1 = self.pooling_mhsa_c1(ref_c1,[8,16,24,32])
+        ref_c2 = self.pooling_mhsa_c2(ref_c2,[4,8,12,16])
+        ref_c3 = self.pooling_mhsa_c3(ref_c3,[2,4,6,8])
+        ref_c4 = self.pooling_mhsa_c4(ref_c4,[1,2,3,4])
+        
+        ref_frame = torch.cat([ref_c1,ref_c2,ref_c3,ref_c4],dim=-1)
+        ref_frame = ref_frame.squeeze(1)
+        # print(ref_frame.shape,self.linear_ref)
+        
+        ref_frame = self.pooling_linear(ref_frame).unsqueeze(0).permute(0,3,1,2)
             
-        c1=c1.reshape(batch_size*ratio, num_clips, -1, c1.shape[-2], c1.shape[-1])
-        c2=c2.reshape(batch_size*ratio, num_clips, -1, c2.shape[-2], c2.shape[-1])
-        c3=c3.reshape(batch_size*ratio, num_clips, -1, c3.shape[-2], c3.shape[-1])
-        c4=c4.reshape(batch_size*ratio, num_clips, -1, c4.shape[-2], c4.shape[-1])
+        c1=full_c1[-4:]
+        c2=full_c2[-4:]
+        c3=full_c3[-4:]
+        c4=full_c4[-4:]
         
+
         query_c1, query_c2, query_c3, query_c4=c1[:,:-1], c2[:,:-1], c3[:,:-1], c4[:,:-1]
         # # remove last frame
         
@@ -396,7 +526,6 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
 
         final_feature = self.hypercorre_module(query_frame,supp_frame)  
         
-        
         # print([i.shape for i in final_feature])
         final_feature = [i.reshape(batch_size,h2,w2,self.embeding).permute(0,3,1,2) for i in final_feature]
         
@@ -406,6 +535,39 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
         
         
         feature_cat = torch.cat(final_feature,dim=0)
+        
+        aux_query_out = self.aux_head(feature_cat[-1].clone().unsqueeze(0))
+        # print(aux_query_out.shape)
+        aux_query_out = F.interpolate(
+            aux_query_out, size=(120, 120), mode="bilinear", align_corners=False
+        )
+        
+        b0,c0,h0,w0 = feature_cat.shape
+        
+        # feature_cat = self.ocrn(feature_cat)
+        ref_frame_dsn = self.dsn_head(ref_frame)
+        ref_frame_ocr = self.ocrn(ref_frame,ref_frame_dsn)
+        
+        # print(feature_cat.shape,ref_frame_ocr.shape,ref_frame.shape)
+        # cat_feature = torch.cat([ref_frame_ocr,ref_frame])
+        
+        feature_cat_last= self.mul_attention(feature_cat[-1].unsqueeze(0),ref_frame_ocr,ref_frame_ocr)
+        
+        feature_cat[-1] = feature_cat_last.reshape(1,c0,h0,w0)
+        
+         
+        # c2 = rearrange(c2.squeeze(0),'b c h w-> b h w c')
+        # c2 = self.linearc2(c2).permute(0,3,1,2)
+        
+        # print(feature_cat.shape,c2.shape)
+        # cat_feature = torch.cat([feature_cat,c2],dim=0)
+        
+        # cat_feature = self.corrconv1(cat_feature)
+        # cat_feature = self.corrconv2(cat_feature)
+        # feature_cat = self.actirelu(cat_feature)
+        
+        # print(feature_cat.shape)
+        # exit()
         
         # final_feature.insert(0,save_x_1)
         
@@ -559,35 +721,37 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
         
         # mask_feature,transformer_encoder_feature = self.pixel_decoder(save_x)
         
-        from einops import rearrange
-        def handle_img(img):
-            kernel= 288
-            overlap=0.333
-            out_res=[480,480]
+        
+        # def handle_img(img):
+        #     kernel= 288
+        #     overlap=0.333
+        #     out_res=[480,480]
             
-            stride = int(kernel * (1 - overlap))
-            unfold = nn.Unfold(kernel_size=kernel, stride=stride)
-            fold = nn.Fold(out_res, kernel_size=kernel, stride=stride)
+        #     stride = int(kernel * (1 - overlap))
+        #     unfold = nn.Unfold(kernel_size=kernel, stride=stride)
+        #     fold = nn.Fold(out_res, kernel_size=kernel, stride=stride)
             
-            cat_img = []
-            for i in range(len(img)):
-                if len(img[i].shape) <4 :
-                    image = F.interpolate(img[i].unsqueeze(0), size=out_res, mode='bilinear', align_corners=False)
-                else:
-                    image = F.interpolate(img[i], size=out_res, mode='bilinear', align_corners=False)
-                image = rearrange(unfold(image).squeeze(0), "(C H W) L-> L C H W", C=3, H=kernel)
-                global_image = F.interpolate(img[i].unsqueeze(0), size=(kernel, kernel), mode='bilinear', align_corners=False)
-                cat_img.append(image)
-                # cat_img.append(global_image)
-            img = torch.cat(cat_img, dim=0)
-            return img
+        #     cat_img = []
+        #     for i in range(len(img)):
+        #         if len(img[i].shape) <4 :
+        #             image = F.interpolate(img[i].unsqueeze(0), size=out_res, mode='bilinear', align_corners=False)
+        #         else:
+        #             image = F.interpolate(img[i], size=out_res, mode='bilinear', align_corners=False)
+        #         image = rearrange(unfold(image).squeeze(0), "(C H W) L-> L C H W", C=3, H=kernel)
+        #         global_image = F.interpolate(img[i].unsqueeze(0), size=(kernel, kernel), mode='bilinear', align_corners=False)
+        #         cat_img.append(image)
+        #         # cat_img.append(global_image)
+        #     img = torch.cat(cat_img, dim=0)
+        #     return img
+        
+        
         
         # img = handle_img(img)
         # feature_cat = handle_img(feature_cat)
         # c4 = handle_img(c4.squeeze(0))
         
         
-        outputs =self.predictor(img,feature_cat,c4)
+        outputs =self.predictor(img[-4:],feature_cat,c4[:,-4:])
         # print(prediction.shape)
 
         if not self.training:
@@ -666,8 +830,9 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
             # # torch.Size([1, 8, 124, 120, 120])
 
             # return res
+        # print(outputs.unsqueeze(0).shape,aux_query_out.shape)
         
-        return torch.cat([outputs.unsqueeze(0)],dim=1)
+        return torch.cat([outputs.unsqueeze(0),aux_query_out.unsqueeze(0)],dim=1)
         # return output
         
     def semantic_inference(self, mask_cls, mask_pred):

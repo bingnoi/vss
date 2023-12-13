@@ -8,16 +8,124 @@ from .transformer.transformer import Transformer
 from .third_party import clip
 from .third_party import imagenet_templates
 
-from einops import rearrange
+from ..adapter import (
+    ClipAdapter,
+    MaskFormerClipAdapter,
+    build_prompt_learner,
+)
 
+from einops import rearrange,repeat
+import yaml
 from .transformer.models import  Aggregator
 
 import numpy as np
 
-# from .hyper_correlation import Corr
-from .hyper_co import Corr
+from .hyper_correlation import Corr
+# from .hyper_correlation_copy import Corr
+# from .hyper_co import Corr
 
-class  CatClassifier(nn.Module):
+from .third_party.model import QuickGELU
+from timm.models.layers import trunc_normal_
+
+
+class MulitHeadAttention(nn.Module):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+
+        self.scale = qk_scale or head_dim ** -0.5
+
+        self.q_proj = nn.Linear(dim, dim, bias=qkv_bias)
+        self.k_proj = nn.Linear(dim, dim, bias=qkv_bias)
+        self.v_proj = nn.Linear(dim, dim, bias=qkv_bias)
+
+
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, q, k, v):
+        # print(q.shape)
+        B, N, C = q.shape
+        B0, M0, C0 = k.shape
+        q = self.q_proj(q).reshape(B, N, self.num_heads, C // self.num_heads).permute(0,2,1,3)
+        k = self.k_proj(k).reshape(B0, M0, self.num_heads, C0 // self.num_heads).permute(0,2,1,3)
+        v = self.v_proj(v).reshape(B0, M0, self.num_heads, C0 // self.num_heads).permute(0,2,1,3)
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+        
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+
+class PromptGeneratorLayer(nn.Module):
+    def __init__(
+        self,
+        d_model,
+        nhead,
+        dropout=0.,
+    ):
+        super().__init__()
+        self.cross_attn = MulitHeadAttention(d_model, nhead, proj_drop=dropout)
+
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm3 = nn.LayerNorm(d_model)
+
+        self.dropout = nn.Dropout(dropout)
+
+        self.mlp = nn.Sequential(
+            nn.Linear(d_model, d_model * 4),
+            QuickGELU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_model * 4, d_model)
+        )
+
+    def forward(self, x, visual):
+        q = k = v = self.norm1(x)
+        x = x + self.cross_attn(q, visual, visual)
+        x = x + self.dropout(self.mlp(self.norm3(x)))
+        return x
+
+
+class VideoSpecificPrompt(nn.Module):
+    def __init__(self, layers=2, embed_dim=512, alpha=0.1,):
+        super().__init__()
+        self.norm = nn.LayerNorm(embed_dim)
+        self.decoder = nn.ModuleList([PromptGeneratorLayer(embed_dim, embed_dim//64) for _ in range(layers)])
+        self.alpha = nn.Parameter(torch.ones(embed_dim) * alpha)
+        self.apply(self._init_weights)
+
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            trunc_normal_(m.weight, std=.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+
+    
+    def forward(self, text, visual):
+        # print(text.shape,visual.shape)
+        b,d,t,c = text.shape
+        visual = rearrange(visual,'b c h w-> b (h w) c')
+        visual = repeat(visual,'b q c -> b d q c',d=d)
+        text = text.reshape(b*d,t,c)
+        visual = visual.reshape(-1,visual.shape[-2],visual.shape[-1])
+        # print(text.shape,visual.shape)
+        B, N, C = visual.shape
+        visual = self.norm(visual)
+        for layer in self.decoder:
+            text = layer(text, visual)
+        
+        return self.alpha * text
+
+class CatClassifier(nn.Module):
     def __init__(self,):
         super().__init__()
         
@@ -142,6 +250,27 @@ class  CatClassifier(nn.Module):
         
         self.corr = Corr()
         
+        self.prompts_generator = VideoSpecificPrompt(layers=1, embed_dim=512, alpha=1e-4,)
+        
+        cfg={'PROMPT_LEARNER':"learnable",
+                "PROMPT_DIM":512,
+                "PROMPT_SHAPE":(16, 0),
+                "PROMPT_CHECKPOINT":"",
+                "CLIP_MODEL_NAME":"ViT-B/16"}
+        
+        # cfg = yaml.dump(cfg)
+        # cfg = yaml.safe_load(cfg)
+        # self.prompt_learner = build_prompt_learner(cfg)
+        # self.clip_adapter = MaskFormerClipAdapter(
+        #     "ViT-B/16",
+        #     self.prompt_learner,
+        #     mask_fill="mean",
+        #     mask_expand_ratio=1.0,
+        #     mask_thr=0.5,
+        #     mask_matting=False,
+        #     region_resized=True,
+        # )
+        
     def forward(self, ori_images,fuse_f,c4, images_tensor=None, ori_sizes=None):
         assert images_tensor == None
         
@@ -158,16 +287,34 @@ class  CatClassifier(nn.Module):
         #     fuse_f[idx+1] = F.interpolate(resize_i,size=self.clip_resolution, mode='bilinear', align_corners=False) 
         # vis = fuse_f[::-1]
         
+        # if self.training:
+        #     text = self.clip_adapter([i for i in self.class_texts])
+        # else:
+        #     text = self.clip_adapter([i for i in self.test_class_texts])
+        
         text = self.text_features if self.training else self.text_features_test
-        # print('text1',text.shape)
         text = text.repeat(img_feat.shape[0], 1, 1, 1)
+        
+        o_text = self.prompts_generator(text, img_feat)
+        
+        o_text = rearrange(o_text,'(b t) d c->b t d c',b=img_feat.shape[0])
+        
+        text = text + o_text
+        
+        # print('text1',text.shape)
+        # text = text.repeat(img_feat.shape[0], 1, 1, 1)
         # print('text2',text.shape)
         
         # out = self.transformer(img_feat, text, vis)
+        # print(fuse_f.shape,img_feat.shape,c4.shape,text.shape)
+        # torch.Size([4, 256, 60, 60]) torch.Size([4, 512, 24, 24]) torch.Size([1, 5, 512, 15, 15]) torch.Size([4, 111, 80, 512])
+        # exit()
         out = self.corr(fuse_f,img_feat,c4,text)
         
         return out
+
     
+
 def zeroshot_classifier(classnames, templates, clip_modelp):
     with torch.no_grad():
         zeroshot_weights = []

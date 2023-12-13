@@ -93,13 +93,13 @@ def inference_segmentor(model, img):
         data['img_metas'] = [i.data[0] for i in data['img_metas']]
 
     # forward the model
-    memory = None
+    # memory = None
     with torch.no_grad():
-        result = model(memory,return_loss=False, rescale=True, **data)
+        result = model(return_loss=False, rescale=True, **data)
     return result
 
 
-def show_result_pyplot(model, img, result, palette=None, fig_size=(15, 10)):
+def show_result_pyplot(model, img, result,label, palette=None, fig_size=(15, 10)):
     """Visualize the segmentation results on the image.
 
     Args:
@@ -114,7 +114,7 @@ def show_result_pyplot(model, img, result, palette=None, fig_size=(15, 10)):
     if hasattr(model, 'module'):
         model = model.module
     img_file=img
-    img = model.show_result(img, result, palette=palette, show=False)
+    img = model.show_result(img, result,label, palette=palette, show=False)
     plt.figure(figsize=fig_size)
     plt.imshow(mmcv.bgr2rgb(img))
     # plt.show()
