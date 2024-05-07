@@ -139,8 +139,8 @@ class CatClassifier(nn.Module):
         deep_supervision = True
         self.mask_classification = True
         self.wordvec = False
-        train_class_json = "/home/lixinhao/vss/mmseg/handle_data/cityscapes_labels.json"
-        test_class_json = "/datadisk2/lixinhao/vss/mmseg/handle_data/cityscapes_labels.json"
+        train_class_json = "/home/lixinhao/vss/mmseg/handle_data/seen_classnames.json"
+        test_class_json = "/home/lixinhao/vss/mmseg/handle_data/unseen_classnames.json"
         # test_class_json = "/datadisk2/lixinhao/vss/mmseg/handle_data/all_classnames.json"
 
         clip_pretrained = "ViT-B/16"

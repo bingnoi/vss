@@ -820,7 +820,7 @@ novel_cls = np.load(r'/home/lixinhao/vss/mmseg/handle_data/group_novel.npy').tol
 
 if __name__ == "__main__":
     
-    dataset_dir = Path() / "/home/lixinhao/vss/data/vspw/VSPW_480p/data"
+    dataset_dir = Path() / "/home/lixinhao/vss/data/test/vspw/VSPW_480p/data"
     
     pool = Pool(32)
 
@@ -836,7 +836,7 @@ if __name__ == "__main__":
                 # print(root)
                 directory, s_filename = os.path.split(root)
                 # print(directory.split(os.path.sep)[-2:])
-                out_path = Path() / "/home/lixinhao/vss/data/vspw/VSPW_480p" / "Detectron" / "val_all" /"/".join(directory.split(os.path.sep)[-2:]) 
+                out_path = Path() / "/home/lixinhao/vss/data/test/vspw/VSPW_480p" / "Detectron" / "val_all" /"/".join(directory.split(os.path.sep)[-2:]) 
                 out_path.mkdir(parents=True, exist_ok=True)
                 out_path_file = out_path/filename
                 read_path = Path() / root / filename

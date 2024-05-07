@@ -27,11 +27,13 @@ from ..builder import build_loss
 from torch.nn import functional as F
 
 from .zero_shot_predictor import TransformerZeroshotPredictor
+
+# from .cat_classify_zero_new import CatClassifier
 from .cat_zeroshot_classifier import CatClassifier
 from .per_pixel import BasePixelDecoder
 from .hyper_correlation import Corr
 
-from einops import rearrange
+from einops import rearrange,repeat
 
 def sem_seg_postprocess(result, img_size, output_height, output_width):
     """
@@ -422,7 +424,7 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
         
         if not self.training and num_clips!=self.num_clips:
             if self.type_inference == "patch":
-                outputs =self.predictor(img,_c_f,c4)
+                outputs,_ =self.predictor(img,_c_f,c4)
                 # print('p',prediction.shape)
                 # outputs = F.interpolate(prediction, size=kernel, mode="bilinear", align_corners=False)
                 outputs = outputs.sigmoid()
@@ -560,13 +562,7 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
         # final_feature.append(f_c4)
         
         feature_cat = torch.cat(final_feature,dim=0)
-        
-        aux_query_out = self.aux_head(feature_cat[-1].clone().unsqueeze(0))
-        aux_query_out = F.interpolate(
-            aux_query_out, size=(120, 120), mode="bilinear", align_corners=False
-        )
 
-        
         b0,c0,h0,w0 = feature_cat.shape
         
         ref_frame_dsn = self.dsn_head(ref_frame)
@@ -773,7 +769,7 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
         # feature_cat = handle_img(feature_cat)
         # c4 = handle_img(c4.squeeze(0))
         
-        outputs =self.predictor(img[-4:],feature_cat,c4[:,-4:])
+        outputs,origin_bert_out =self.predictor(img[-4:],feature_cat,c4[:,-4:])
         # print(prediction.shape)
 
         if not self.training:
@@ -854,6 +850,19 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
             # return res
 
         # print(outputs.unsqueeze(0).shape,aux_query_out.shape)
+        # print(origin_bert_out.shape)
+
+        b,c,h,w = feature_cat[-1].unsqueeze(0).shape
+        origin_bert_out = repeat(origin_bert_out,'b c->b c h w',h=h,w=w)
+        origin_bert_out = origin_bert_out + feature_cat[-1].clone().unsqueeze(0)
+
+        # print(feature_cat[-1].clone().unsqueeze(0).shape)
+        
+        aux_query_out = self.aux_head(origin_bert_out)
+
+        aux_query_out = F.interpolate(
+            aux_query_out, size=(120, 120), mode="bilinear", align_corners=False
+        )
         
         return torch.cat([outputs.unsqueeze(0),aux_query_out.unsqueeze(0)],dim=1)
         # return outputs.unsqueeze(0)

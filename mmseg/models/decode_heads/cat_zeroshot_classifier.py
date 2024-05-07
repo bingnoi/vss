@@ -134,7 +134,7 @@ class CatClassifier(nn.Module):
         self.mask_classification = True
         self.wordvec = False
         train_class_json = "/home/lixinhao/vss/mmseg/handle_data/seen_classnames.json"
-        test_class_json = "/datadisk2/lixinhao/vss/mmseg/handle_data/unseen_classnames.json"
+        test_class_json = "/home/lixinhao/vss/mmseg/handle_data/unseen_classnames.json"
         # test_class_json = "/datadisk2/lixinhao/vss/mmseg/handle_data/cityscapes_labels.json"
         # test_class_json = "/datadisk2/lixinhao/vss/mmseg/handle_data/all_classnames.json"
 
@@ -199,7 +199,7 @@ class CatClassifier(nn.Module):
             self.clip_model = clip_model.float()
             self.clip_preprocess = clip_preprocess
         
-        clip_finetune = "attention1"
+        clip_finetune = "attention"
 
         # self.original_clip = copy.deepcopy(self.clip_model.visual)
         # for name,params in self.original_clip.named_parameters():
@@ -259,6 +259,9 @@ class CatClassifier(nn.Module):
                 "PROMPT_SHAPE":(16, 0),
                 "PROMPT_CHECKPOINT":"",
                 "CLIP_MODEL_NAME":"ViT-B/16"}
+
+        # self.cross_attn_fuse = MulitHeadAttention(512, 4, proj_drop=0.)
+        self.linear_down = nn.Linear(512,256)
         
         # cfg = yaml.dump(cfg)
         # cfg = yaml.safe_load(cfg)
@@ -276,14 +279,23 @@ class CatClassifier(nn.Module):
     def forward(self, ori_images,fuse_f,c4, images_tensor=None, ori_sizes=None):
         assert images_tensor == None
 
-        # ori_images_bert = self.final_cls_token
-        # ori_images_bert = ori_images_bert / ori_images_bert.norm(dim=-1, keepdim=True)
-        # ori_images_bert = ori_images_bert.unsqueeze(1)
-
-        # aux_query_out = aux_query_out
-        
         ori_images = torch.cat([ori_images],dim=0)
         ori_images = F.interpolate(ori_images, size=self.clip_resolution, mode='bilinear', align_corners=False)
+
+
+        ori_images_bert = self.clip_model.encode_image(ori_images[-1,:].unsqueeze(0), get_embeding=True,dense=True)
+        ori_images_bert = self.linear_down(ori_images_bert)
+        ori_images_bert = ori_images_bert / ori_images_bert.norm(dim=-1, keepdim=True)
+        ori_images_bert = ori_images_bert
+
+
+        # aux_query_out = rearrange(aux_query_out,"b t h w->b t (h w)")
+         
+        # print(aux_query_out.shape,ori_images_bert.shape)
+        # torch.Size([1, 81, 900]) torch.Size([4, 1, 512])
+        # aux_query_out = self.cross_attn_fuse(aux_query_out,ori_images_bert,ori_images_bert)
+
+        # aux_query_out = rearrange(aux_query_out,"b t (h w)->b t h w",h=h,w=w)
 
         clip_features = self.clip_model.encode_image(ori_images, dense=True)
 
@@ -325,7 +337,7 @@ class CatClassifier(nn.Module):
         
         out = self.corr(fuse_f,img_feat,c4,text)
         
-        return out
+        return out,ori_images_bert
 
 def zeroshot_classifier(classnames, templates, clip_modelp):
     with torch.no_grad():

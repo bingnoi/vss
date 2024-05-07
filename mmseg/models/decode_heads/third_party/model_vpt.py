@@ -253,7 +253,22 @@ class VisualTransformer(nn.Module):
         self.patch_size = patch_size
         self.input_resolution = input_resolution
 
-    def forward(self, x: torch.Tensor, dense=False):
+        self.pool_type = 'avg'
+
+    def _global_pool(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        if self.pool_type == 'avg':
+            pooled, tokens = x[:, 1:].mean(dim=1), x[:, 1:]
+        elif self.pool_type == 'tok':
+            pooled, tokens = x[:, 0], x[:, 1:]
+        else:
+            pooled = tokens = x
+
+        return pooled, tokens
+
+    def forward(self, x: torch.Tensor,dense=False,get_embeding=False):
+        # print('qqq',x.shape) 
+        # torch.Size([4, 3, 384, 384])
+
         x = self.conv1(x)  # shape = [*, width, grid, grid]
         x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
@@ -274,6 +289,11 @@ class VisualTransformer(nn.Module):
             x = self.ln_post(x[:, :, :])
         else:
             x = self.ln_post(x[:, 0, :])
+
+        if get_embeding:
+            pooled, tokens = self._global_pool(x)
+            x = pooled @ self.proj
+            return x
 
         if self.proj is not None:
             x = x @ self.proj
@@ -373,9 +393,11 @@ class CLIP(nn.Module):
         return self.visual.conv1.weight.dtype
 
 
-    def encode_image(self, image, masks=None, pool_mask=None, dense=False):
+    def encode_image(self, image, masks=None, pool_mask=None, dense=False, get_embeding=False):
         if pool_mask is not None:
             return self.visual(image.type(self.dtype), mask=pool_mask, dense=dense)
+        if get_embeding:
+            return self.visual(image.type(self.dtype), get_embeding=get_embeding, dense=dense)
         if masks == None:
             return self.visual(image.type(self.dtype), dense=dense)
         else:

@@ -23,7 +23,7 @@ class ClipAdapter(nn.Module):
         super().__init__()
         # self.clip_model, _, preprocess, _ = create_model_and_transforms(model_name='ViT-B/14', pretrained='datacomp_xl_s13b_b90k')
 
-        self.clip_model, _, preprocess = create_model_and_transforms('ViT-B-16', pretrained='laion2b_s34b_b79k')
+        self.clip_model, _, preprocess = create_model_and_transforms('ViT-B/16', pretrained='laion2b_s34b_b79k')
         # self.clip_model, preprocess= create_model_from_pretrained("/datadisk2/lixinhao/vss/model_open_clip")
         self.tokenizer = get_tokenizer('ViT-L/14')
         self.original_clip = copy.deepcopy(self.clip_model.visual)
