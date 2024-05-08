@@ -2677,7 +2677,7 @@ class CustomDataset_video3(Dataset):
         # self.test_class = ['door', 'Playground_slide', 'goal', 'building', 'lake', 'flag', 'motorcycle', 'lamp', 'basket', 'barrel', 'other_machine', 'fan', 'computer']
         # self.test_plate = [[6, 230, 230], [140, 140, 140], [224, 5, 255], [61, 230, 250], [102, 8, 255], [255, 5, 153], [255, 31, 0], [31, 0, 255], [255, 92, 0], [0, 31, 255], [0, 255, 10], [163, 255, 0], [70, 184, 160]]
         
-        self.test_setting = 'val_all'
+        self.test_setting = 'val_unseen'
         # remember to modify setting in cat_zeroshot_classifier.py line 34-35
         
         # self.custom_classes = False
@@ -3518,7 +3518,7 @@ class CustomDataset_video4(Dataset):
         # self.test_class = ['door', 'Playground_slide', 'goal', 'building', 'lake', 'flag', 'motorcycle', 'lamp', 'basket', 'barrel', 'other_machine', 'fan', 'computer']
         # self.test_plate = [[6, 230, 230], [140, 140, 140], [224, 5, 255], [61, 230, 250], [102, 8, 255], [255, 5, 153], [255, 31, 0], [31, 0, 255], [255, 92, 0], [0, 31, 255], [0, 255, 10], [163, 255, 0], [70, 184, 160]]
         
-        self.test_setting = 'val_all'
+        self.test_setting = 'val_unseen'
         # remember to modify setting in cat_zeroshot_classifier.py line 34-35
         
         # self.custom_classes = False

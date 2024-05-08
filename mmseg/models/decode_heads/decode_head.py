@@ -667,7 +667,7 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                 seg_label_last3frame = seg_label[:,:-1].reshape(batch_size*(num_clips_last-1),-1,h,w)
                 seg_label_lastframe = seg_label[:,-1:].reshape(batch_size,-1,h,w)
 
-            elif self.self_ensemble2 and seg_logit.shape[1]==5 and seg_label.shape[1]==1 :
+            elif self.self_ensemble2 and seg_logit.shape[1]==5 and seg_label.shape[1]==1:
                 seg_logit_ori=seg_logit[:,-2:]
                 batch_size, n, _, h ,w=seg_logit_ori.shape
                 seg_logit_ori=seg_logit_ori.reshape(batch_size,n,-1,h,w)
@@ -719,8 +719,12 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         # print(seg_logit_ori.shape,seg_label_ori.shape)
         
         loss['loss_seg'] = self.loss_decode(
-            seg_logit_ori,
-            seg_label_ori,
+            seg_logit_ori[:,0],
+            seg_label_ori[:,0],
+            weight=seg_weight,
+            ignore_index=self.ignore_index)+0.5*self.loss_decode(
+            seg_logit_ori[:,1],
+            seg_label_ori[:,1],
             weight=seg_weight,
             ignore_index=self.ignore_index)
         

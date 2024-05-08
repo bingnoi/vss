@@ -97,7 +97,7 @@ lr_config = dict(_delete_=True, policy='poly',
                 #  warmup_ratio=1e-8,
                  power=0.9, min_lr=0.0, by_epoch=False)
 
-data = dict(samples_per_gpu=1,workers_per_gpu=1)
+data = dict(samples_per_gpu=1,workers_per_gpu=2)
 optimizer_config = dict(type='GradientCumulativeOptimizerHook', cumulative_iters=4)
 # evaluation = dict(interval=4000, metric='mIoU')
 evaluation = dict(interval=100000, metric='mIoU')
