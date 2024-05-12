@@ -852,18 +852,24 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
         # print(outputs.unsqueeze(0).shape,aux_query_out.shape)
         # print(origin_bert_out.shape)
 
-        b,c,h,w = feature_cat[-1].unsqueeze(0).shape
-        origin_bert_out = repeat(origin_bert_out,'b c->b c h w',h=h,w=w)
-        origin_bert_out = origin_bert_out + feature_cat[-1].clone().unsqueeze(0)
-
-        # print(feature_cat[-1].clone().unsqueeze(0).shape)
+        # b,c,h,w = feature_cat[-1].unsqueeze(0).shape
+        # origin_bert_out = repeat(origin_bert_out,'b c->b c h w',h=h,w=w)
+        # # print('2',origin_bert_out.shape)
+        # origin_bert_out = origin_bert_out + feature_cat[-1].clone().unsqueeze(0)
         
-        aux_query_out = self.aux_head(origin_bert_out)
+        # aux_query_out = self.aux_head(origin_bert_out)
+
+        aux_query_out = self.aux_head(feature_cat[-1].clone().unsqueeze(0))
+
+        # print('3',aux_query_out.shape)
+        # 1 torch.Size([1, 3, 384, 384])
+        # 2 torch.Size([1, 256, 30, 30])
+        # 3 torch.Size([1, 81, 30, 30])
 
         aux_query_out = F.interpolate(
             aux_query_out, size=(120, 120), mode="bilinear", align_corners=False
         )
-        
+
         return torch.cat([outputs.unsqueeze(0),aux_query_out.unsqueeze(0)],dim=1)
         # return outputs.unsqueeze(0)
         

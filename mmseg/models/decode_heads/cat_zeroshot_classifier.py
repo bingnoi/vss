@@ -284,6 +284,7 @@ class CatClassifier(nn.Module):
 
 
         ori_images_bert = self.clip_model.encode_image(ori_images[-1,:].unsqueeze(0), get_embeding=True,dense=True)
+        # print('1',ori_images[-1,:].unsqueeze(0).shape)
         ori_images_bert = self.linear_down(ori_images_bert)
         ori_images_bert = ori_images_bert / ori_images_bert.norm(dim=-1, keepdim=True)
         ori_images_bert = ori_images_bert

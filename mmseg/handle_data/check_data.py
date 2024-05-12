@@ -9,7 +9,7 @@ oc =  mmcv.imread(origin_file_name,flag="unchanged",backend="pillow")
 file_name = "/datadisk2/lixinhao/vss/data/test/vspw/VSPW_480p/data/2225_6acPX_00M9Q/mask/00000224.png"
 c =  mmcv.imread(file_name,flag="unchanged",backend="pillow")
 
-new_file_name = "/home/lixinhao/vss/data/test/vspw/VSPW_480p/Detectron/train_seen/data/1385_Ycwibat6X-M/00000618.png"
+new_file_name = "/datadisk2/lixinhao/vss/eccv_img_new/mask/00000604.png"
 cs =  mmcv.imread(new_file_name,flag="unchanged",backend="pillow")
 
-print(np.unique(oc),np.unique(c),c,np.unique(cs))
+print(np.unique(cs))

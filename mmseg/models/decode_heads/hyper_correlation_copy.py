@@ -404,6 +404,38 @@ def conv1x1(in_planes, out_planes, stride=1):
     """1x1 convolution"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
 
+class MulitHeadAttention(nn.Module):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+
+        self.scale = qk_scale or head_dim ** -0.5
+
+        self.q_proj = nn.Linear(dim, dim, bias=qkv_bias)
+        self.k_proj = nn.Linear(dim, dim, bias=qkv_bias)
+        self.v_proj = nn.Linear(dim, dim, bias=qkv_bias)
+
+
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, q, k, v):
+        B, N, C = q.shape
+        B0, M0, C0 = k.shape
+        q = self.q_proj(q).reshape(B, N, self.num_heads, C // self.num_heads).permute(0,2,1,3)
+        k = self.k_proj(k).reshape(B0, M0, self.num_heads, C0 // self.num_heads).permute(0,2,1,3)
+        v = self.v_proj(v).reshape(B0, M0, self.num_heads, C0 // self.num_heads).permute(0,2,1,3)
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+        
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
 
 class ensemble(nn.Module):
     def __init__(self, hidden_dim=64, text_guidance_dim=512, appearance_guidance=512, nheads=4, input_resolution=(20, 20), pooling_size=(5, 5), window_size=(10, 10), attention_type='linear') -> None:
@@ -442,7 +474,10 @@ class ensemble(nn.Module):
         self.pooling_new = nn.AdaptiveAvgPool2d((24, 24))
         # self.pooling_new =nn.Conv2d(208, 208, kernel_size=3, stride=1, padding=1)
 
-        self.downlinear = nn.Linear(208,80,bias=True)
+        # self.multi_head = MulitHeadAttention()
+
+        self.down_linear = nn.Linear(128,80,bias=True)
+        self.downlinear = nn.Linear(160,80,bias=True)
 
     def forward(self,x,img,text):
         # print('0',x.shape,img.shape,text.shape)
@@ -464,15 +499,24 @@ class ensemble(nn.Module):
         img = repeat(img,'b c h w->(b t) c h w',t=T)
         
         # print('1',x.shape,img.shape)
+        # 1 torch.Size([324, 80, 24, 24]) torch.Size([324, 128, 24, 24])
+        # exit()
+
+        # x = torch.cat([x,img],dim=1)
+
+        x = x.permute(0,2,3,1)
+        img = img.permute(0,2,3,1)
+
+        img = self.down_linear(img)
+
+        x = x + img
         
-        x = torch.cat([x,img],dim=1)
-        
-        x = self.pooling_new(x).permute(0,2,3,1)
+        x = self.pooling_new(x.permute(0,3,1,2))
         # x = x.permute(0,2,3,1)
         
-        # print('2',x.shape,img.shape)
+        # print('2',x.shape)
         
-        x = self.downlinear(x)
+        # x = self.downlinear(x)
         
         # print('3',x.shape,img.shape)
         

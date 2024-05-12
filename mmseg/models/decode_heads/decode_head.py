@@ -716,17 +716,21 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
         #     print(np.unique(seg_label_ori.cpu()),np.unique(seg_label_ori.cpu()))
         #     exit()
 
-        # print(seg_logit_ori.shape,seg_label_ori.shape)
-        
         loss['loss_seg'] = self.loss_decode(
-            seg_logit_ori[:,0],
-            seg_label_ori[:,0],
-            weight=seg_weight,
-            ignore_index=self.ignore_index)+0.5*self.loss_decode(
-            seg_logit_ori[:,1],
-            seg_label_ori[:,1],
+            seg_logit_ori,
+            seg_label_ori,
             weight=seg_weight,
             ignore_index=self.ignore_index)
+        
+        # loss['loss_seg'] = self.loss_decode(
+        #     seg_logit_ori[0].unsqueeze(0),
+        #     seg_label_ori[0].unsqueeze(0),
+        #     weight=seg_weight,
+        #     ignore_index=self.ignore_index)+0.5*self.loss_decode(
+        #     seg_logit_ori[1].unsqueeze(0),
+        #     seg_label_ori[1].unsqueeze(0),
+        #     weight=seg_weight,
+        #     ignore_index=self.ignore_index)
         
         # loss['loss_seg'] = self.loss_decode(
         #     seg_logit_ori,

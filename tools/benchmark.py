@@ -1,6 +1,9 @@
 import argparse
 import time
 
+import sys
+sys.path.append("/datadisk/lixinhao/vss")
+
 import torch
 from mmcv import Config
 from mmcv.parallel import MMDataParallel

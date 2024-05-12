@@ -2,10 +2,15 @@
 
 CONFIG=$1
 GPUS=$2
+# PORT=${PORT:-43493}
 # PORT=${PORT:-43494}
 # PORT=${PORT:-43495}
-PORT=${PORT:-43496}
-# PORT=${PORT:-43497}
+# PORT=${PORT:-43496}
+PORT=${PORT:-43497}
+# PORT=${PORT:-43498}
+# PORT=${PORT:-43499}
+# PORT=${PORT:-43500}
+# PORT=${PORT:-43501}
 
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
 python -m torch.distributed.launch --nproc_per_node=$GPUS --master_port=$PORT \
