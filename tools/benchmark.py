@@ -6,6 +6,8 @@ from mmcv import Config
 from mmcv.parallel import MMDataParallel
 from mmcv.runner import load_checkpoint
 
+import sys
+sys.path.append("/datadisk2/lixinhao/vss")
 from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.models import build_segmentor
 
