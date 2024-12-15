@@ -76,7 +76,7 @@ if __name__ == "__main__":
                     file_list.append((read_path,out_path_file))
                     
         pool.map(worker,file_list)
-        idset.sort()
-        for i in idset:
-            print(i)  
+        # idset.sort()
+        # for i in idset:
+        #     print(i)  
         print('done {}'.format(t))
