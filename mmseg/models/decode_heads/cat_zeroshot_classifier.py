@@ -133,13 +133,10 @@ class CatClassifier(nn.Module):
         deep_supervision = True
         self.mask_classification = True
         self.wordvec = False
-        train_class_json = "/home/lixinhao/vss/mmseg/handle_data/seen_classnames.json"
-        test_class_json = "/datadisk2/lixinhao/vss/mmseg/handle_data/unseen_classnames.json"
-        # test_class_json = "/datadisk2/lixinhao/vss/mmseg/handle_data/cityscapes_labels.json"
-        # test_class_json = "/datadisk2/lixinhao/vss/mmseg/handle_data/all_classnames.json"
+        train_class_json = "/root/vss/mmseg/handle_data/seen_classnames.json"
+        test_class_json = "/root/vss/mmseg/handle_data/unseen_classnames.json"
 
         clip_pretrained = "ViT-B/16"
-        # clip_pretrained = "ViT-L/14@336px"
         prompt_ensemble_type = "imagenet"
         train_class_indexes_json = "datasets/coco/coco_stuff/split/seen_indexes.json"
         test_class_indexes_json = "datasets/coco/coco_stuff/split/seen_indexes.json"
