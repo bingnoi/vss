@@ -1,7 +1,6 @@
 # dataset settings
 dataset_type = 'VSPWDataset4'
-# data_root = '/home/lixinhao/vss/data/vspw/VSPW_480p'
-data_root = '/home/lixinhao/vss/data/test/vspw/VSPW_480p'
+data_root = '/home/lixinhao/vss/data/vspw/VSPW_480p'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 crop_size = (480, 480)

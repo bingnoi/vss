@@ -556,6 +556,9 @@ class hypercorre_topk2(nn.Module):
         # if not self.training:
         #     ratio=5
 
+        intermediate_weight_f1 = []
+        intermediate_weight_f2 = []
+
         for ii in range(0,4): #according to ratio
             for fi in range(1,len(query_frame)-1):  #t-9 t-6 t-3 t
                 if ii==0 and fi==1:
@@ -564,29 +567,29 @@ class hypercorre_topk2(nn.Module):
                     last_feature_p = self.pk1(last_feature)
                     # p_features.append(last_feature_p)
                     # last_feature_fv1=self.pooling_mhsa_fv1(query_frame[ii][:,fi:fi+1],[1,2,3,4])
-                    last_feature_f1=self.f1p(last_feature)
-                    last_features_cat6.append(last_feature_f1)
+                    last_feature_v=self.f1p(last_feature)
+                    last_features_cat6.append(last_feature_v)
                 elif ii==1 and fi==1:
                     last_feature = self.pooling_mhsa_fk2(query_frame[ii][:,fi-1:fi],[2,4,6,8])
                     last_feature_p = self.pk2(last_feature)
                     # p_features.append(last_feature_p)
                     # last_feature_fv2=self.pooling_mhsa_fv2(query_frame[ii][:,fi:fi+1],[2,4,6,8])
-                    last_feature_f2=self.f2p(last_feature)
-                    last_features_cat6.append(last_feature_f2)
+                    last_feature_v=self.f2p(last_feature)
+                    last_features_cat6.append(last_feature_v)
                 elif ii==2 and fi==1:
                     last_feature = self.pooling_mhsa_fk3(query_frame[ii][:,fi-1:fi],[4,8,12,16])
                     last_feature_p = self.pk3(last_feature)
                     # p_features.append(last_feature_p)
                     # last_feature_fv3=self.pooling_mhsa_fv3(query_frame[ii][:,fi:fi+1],[4,8,12,16])
-                    last_feature_f3=self.f3p(last_feature)
-                    last_features_cat6.append(last_feature_f3)
+                    last_feature_v=self.f3p(last_feature)
+                    last_features_cat6.append(last_feature_v)
                 elif ii==3 and fi==1:
                     last_feature = self.pooling_mhsa_fk4(query_frame[ii][:,fi-1:fi],[8,16,24,32])
                     last_feature_p = self.pk4(last_feature)
                     # p_features.append(last_feature_p)
                     # last_feature_fv4=self.pooling_mhsa_fv4(query_frame[ii][:,fi:fi+1],[8,16,24,32])
-                    last_feature_f4=self.f4p(last_feature)
-                    last_features_cat6.append(last_feature_f4)
+                    last_feature_v=self.f4p(last_feature)
+                    last_features_cat6.append(last_feature_v)
 
                 # print('qqqkkk',ii,fi,query_qkv_all[ii][:,fi-1:fi].shape,last_feature_p.transpose(2,3).shape)
                 step_atten = torch.matmul(query_qkv_all[ii][:,fi:fi+1],last_feature_p.transpose(2,3).unsqueeze(1)) #qk
@@ -594,6 +597,7 @@ class hypercorre_topk2(nn.Module):
 
 
                 # store intermediate atten for hpn
+
                 if fi == 1:
                     step_atten_1.append(step_atten)
                 elif fi == 2:
@@ -601,19 +605,19 @@ class hypercorre_topk2(nn.Module):
 
 
                 if fi == 1:
-                    if  ii == 0:
-                        qkv = torch.matmul(step_atten,last_feature_f1.unsqueeze(1))
-                    elif ii == 1:
-                        qkv = torch.matmul(step_atten,last_feature_f2.unsqueeze(1))
-                    elif ii == 2:
-                        qkv = torch.matmul(step_atten,last_feature_f3.unsqueeze(1))
-                    else:
-                        qkv = torch.matmul(step_atten,last_feature_f4.unsqueeze(1))
+                    qkv = torch.matmul(step_atten,last_feature_v.unsqueeze(1))
+                    # if  ii == 0:
+                    #     qkv = torch.matmul(step_atten,last_feature_f1.unsqueeze(1))
+                    # elif ii == 1:
+                    #     qkv = torch.matmul(step_atten,last_feature_f2.unsqueeze(1))
+                    # elif ii == 2:
+                    #     qkv = torch.matmul(step_atten,last_feature_f3.unsqueeze(1))
+                    # else:
+                    #     qkv = torch.matmul(step_atten,last_feature_f4.unsqueeze(1))
+                    # intermediate_weight_f1.append(qkv)
                 else:
                     qkv = torch.matmul(step_atten,last_feature_v.unsqueeze(1))
-
-                # if fi == 1:
-                #     qkv = query_qkv_all[ii][:,fi-1:fi]
+                    # intermediate_weight_f2.append(qkv)
                 
                 if ii==0 and fi==1:
                     # print('qkv',qkv.permute(0,1,4,2,3).shape)

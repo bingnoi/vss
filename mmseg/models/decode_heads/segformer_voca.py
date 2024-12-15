@@ -411,8 +411,6 @@ class SegFormerHead_CAT(BaseDecodeHead_clips):
 
         self.type_inference = "patch"
         
-        
-        # print(c1.shape,c2.shape,c3.shape,c4.shape)
         c4 = self.linear_down_c4(c4).reshape(-1,c4.shape[2], c4.shape[3],self.embeding).permute(0,3,1,2)
         c3 = self.linear_down_c3(c3).reshape(-1,c3.shape[2], c3.shape[3],self.embeding).permute(0,3,1,2)
         c2 = self.linear_down_c2(c2).reshape(-1,c2.shape[2], c2.shape[3],self.embeding).permute(0,3,1,2)

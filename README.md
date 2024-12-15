@@ -1,12 +1,13 @@
-# VSS-MRCFA
-Official PyTorch implementation of ECCV 2022 paper: Mining Relations among Cross-Frame Affinities for Video Semantic Segmentation
+# OV2VSS
+Official PyTorch implementation of Towards Open-Vocabulary Video Semantic Segmentation
 
 ## Abstract
-The essence of video semantic segmentation (VSS) is how to leverage temporal information for prediction. Previous efforts are mainly devoted to developing new techniques to calculate the cross-frame affinities such as optical flow and attention. Instead, this paper contributes from a different angle by  mining relations among cross-frame affinities, upon which better temporal information aggregation could be achieved. We explore relations among affinities in two aspects: single-scale intrinsic correlations and multi-scale relations. Inspired by traditional feature processing, we propose Single-scale Affinity Refinement (SAR) and Multi-scale Affinity Aggregation (MAA). To make it feasible to execute MAA, we propose a Selective Token Masking (STM) strategy to select a subset of consistent reference tokens for different scales when calculating affinities, which also improves the efficiency of our method. At last, the cross-frame affinities strengthened by SAR and MAA are adopted for adaptively aggregating temporal information. Our experiments demonstrate that the proposed method performs favorably against state-of-the-art VSS methods.
+Semantic segmentation in videos has been a focal point of recent research. However, existing models encounter challenges when faced with unfamiliar categories. To address this, we introduce the Open Vocabulary Video Semantic Segmentation (OV-VSS) task, designed to accurately segment every pixel across a wide range of open-vocabulary categories, including those that are novel or previously unexplored. To enhance OV-VSS performance, we propose a robust baseline, OV2VSS, which integrates a spatial-temporal fusion module, allowing the model to utilize temporal relationships across consecutive frames. Additionally, we incorporate a random frame enhancement module, broadening the model’s understanding of semantic context throughout the entire video sequence. Our approach also includes video text encoding, which strengthens the model's capability to interpret textual information within the video context.
+Comprehensive evaluations on benchmark datasets such as VSPW and Cityscapes highlight OV-VSS’s zero-shot generalization capabilities, especially in handling novel categories. The results validate OV2VSS's effectiveness, demonstrating improved performance in semantic segmentation tasks across diverse video datasets.
 
-![block images](https://github.com/GuoleiSun/VSS-MRCFA/blob/main/Figs/diagram.png)
+![block images](resources/overall_new.png)
 
-Authors: [Guolei Sun](https://scholar.google.com/citations?hl=zh-CN&user=qd8Blw0AAAAJ), [Yun Liu](https://yun-liu.github.io/), [Hao Tang](https://scholar.google.com/citations?user=9zJkeEMAAAAJ&hl=en), [Ajad Chhatkuli](https://scholar.google.com/citations?user=3BHMHU4AAAAJ&hl=en), [Le Zhang](https://zhangleuestc.github.io), Luc Van Gool.
+Authors: [Xinhao Li](), [Yun Liu](https://yun-liu.github.io/), [Guolei Sun](https://scholar.google.com/citations?hl=zh-CN&user=qd8Blw0AAAAJ), [Min Wu](https://scholar.google.com/citations?user=Hji1uWQAAAAJ&hl=zh-CN), [Le Zhang](https://zhangleuestc.github.io), [Ce Zhu](http://www.avc2-lab.net/~eczhu/).
 
 ## Note
 This is a preliminary version for early access and I will clean it for better readability.
@@ -15,12 +16,8 @@ This is a preliminary version for early access and I will clean it for better re
 Please follow the guidelines in [MMSegmentation v0.13.0](https://github.com/open-mmlab/mmsegmentation/tree/v0.13.0).
 
 Other requirements:
-```timm==0.3.0, CUDA11.0, pytorch==1.7.1, torchvision==0.8.2, mmcv==1.3.0, opencv-python==4.5.2```
+```timm==0.3.0, CUDA11.1, pytorch==1.9.0, torchvision==0.8.2, mmcv==1.3.9```
 
-Download this repository and install by:
-```
-cd VSS-MRCFA && pip install -e . --user
-```
 
 ## Usage
 ### Data preparation
@@ -34,27 +31,33 @@ vspw-480
     └── mask
         └── .png
 ```
-The dataset should be put in ```VSS-MRCFA/data/vspw/```. Or you can use Symlink: 
+The dataset should be put in ```/data/vspw/```. Or you can use Symlink: 
 ```
-cd VSS-MRCFA
 mkdir -p data/vspw/
 ln -s /dataset_path/VSPW_480p data/vspw/
 ```
 
-### Test
-1. Download the trained weights from [here](https://drive.google.com/drive/folders/1GIKt21UBYjXqi0Zm_azc6SrrIcK__Lyq?usp=sharing).
-2. Run the following commands:
+Split and mask data: (note that the path should be changed according to your own)
 ```
-# Multi-gpu testing
-./tools/dist_test.sh local_configs/mrcfa/B1/mrcfa.b1.480x480.vspw2.160k.py /path/to/checkpoint_file <GPU_NUM> \
---out /path/to/save_results/res.pkl
+python mmseg/handle_data/prepare_vspw_seen.py
+python mmseg/handle_data/prepare_vspw_unseen.py
+python mmseg/handle_data/prepare_vspw_val.py
 ```
 
 ### Training
-Training requires 4 Nvidia GPUs, each of which has > 20G GPU memory.
+Training only requires 1 Nvidia GPUs, which has > 20G GPU memory.
 ```
 # Multi-gpu training
-./tools/dist_train.sh local_configs/mrcfa/B1/mrcfa.b1.480x480.vspw2.160k.py 4 --work-dir model_path/vspw2/work_dirs_4g_b1
+./tools/dist_train.sh local_configs/vit/vitb/vitb.py 1 --work-dir model_path/vspw2/work_dirs_4g_b1
+```
+
+### Test
+1. Download the trained weights from [here]().
+2. Run the following commands:
+```
+# Multi-gpu testing
+./tools/dist_test.sh local_configs/vit/vitb/vitb.py /path/to/checkpoint_file <GPU_NUM> \
+--out /path/to/save_results/res.pkl
 ```
 
 ## License
@@ -64,20 +67,20 @@ This project is only for academic use. For other purposes, please contact us.
 The code is heavily based on the following repositories:
 - https://github.com/open-mmlab/mmsegmentation
 - https://github.com/NVlabs/SegFormer
-- https://github.com/GuoleiSun/VSS-CFFM
+- https://github.com/GuoleiSun/VSS-MRCFA
 
 Thanks for their amazing works.
 
 ## Citation
 ```
-@article{sun2022mining,
-  title={Mining Relations among Cross-Frame Affinities for Video Semantic Segmentation},
-  author={Sun, Guolei and Liu, Yun and Tang, Hao and Chhatkuli, Ajad and Zhang, Le and Van Gool, Luc},
-  journal={arXiv preprint arXiv:2207.10436},
-  year={2022}
+@article{li2024towards,
+  title={Towards Open-Vocabulary Video Semantic Segmentation},
+  author={Li, Xinhao and Liu, Yun and Sun, Guolei and Wu, Min and Zhang, Le and Zhu, Ce},
+  journal={arXiv preprint arXiv:2412.09329},
+  year={2024}
 }
 ```
 
 ## Contact
-- Guolei Sun, sunguolei.kaust@gmail.com
-- Yun Liu, yun.liu@vision.ee.ethz.ch
+- Xinhao Li, oliverfuus@gmail.com
+- Le Zhang, 

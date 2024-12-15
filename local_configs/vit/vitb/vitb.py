@@ -11,12 +11,6 @@ find_unused_parameters = True
 model = dict(
     type='EncoderDecoder_clips',
     pretrained='pretrain/sam_vit_b_01ec64.pth',
-    # pretrained = "https://download.pytorch.org/models/resnet101-5d3b4d8f.pth",
-    # backbone=dict(
-    #     # type='mit_b2',
-    #     # style='pytorch'),
-    #     type='ResNet',
-    #     depth=101),
     backbone=dict(
         type='ImageEncoderViT',
         depth=12,
@@ -51,13 +45,8 @@ model = dict(
     #     norm_eval=False,
     #     interpolate_mode='bicubic'),
     decode_head=dict(
-        # type='SegFormerHead_clips2_resize_1_8_hypercorrelation2_topk_ensemble4',      ## SegFormerHead_clips2_resize_1_8_hypercorrelation3
-        # type='MLPHead',
-        # num_infer = 5,
         type='SegFormerHead_CAT',
         in_channels=[256, 256, 256, 256],
-        # in_channels=[256,512,1024,2048],
-        # in_channels=[768,768,768,768],
         in_index=[0, 1, 2, 3],
         feature_strides=[4, 8, 16, 32],
         channels=128,
@@ -76,13 +65,6 @@ model = dict(
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
 
-# optimizer
-# optimizer = dict(_delete_=True, type='AdamW', lr=0.00006 , betas=(0.9, 0.999), weight_decay=0.01,
-#                  paramwise_cfg=dict(custom_keys={'pos_block': dict(decay_mult=0.),
-#                                                  'norm': dict(decay_mult=0.),
-#                                                  'head': dict(lr_mult=10.)
-#                                                  }))
-
 optimizer = dict(_delete_=True, type='AdamW', lr=0.000003 , betas=(0.9, 0.999), weight_decay=0.01,
                  paramwise_cfg=dict(custom_keys={'pos_block': dict(decay_mult=0.),
                                                  'norm': dict(decay_mult=0.),
@@ -99,5 +81,4 @@ lr_config = dict(_delete_=True, policy='poly',
 
 data = dict(samples_per_gpu=1,workers_per_gpu=4)
 optimizer_config = dict(type='GradientCumulativeOptimizerHook', cumulative_iters=4)
-# evaluation = dict(interval=4000, metric='mIoU')
 evaluation = dict(interval=100000, metric='mIoU')
