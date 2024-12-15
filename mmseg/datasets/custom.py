@@ -971,9 +971,6 @@ class CustomDataset_cityscape_clips(Dataset):
             list[dict]: All image info of dataset.
         """
 
-        # print(img_suffix,ann_dir,seg_map_suffix,split)
-        # _leftImg8bit.png, /datadisk2/lixinhao/cityscapes/gtFine/train, _gtFine_labelTrainIds.png, None
-
         img_infos = []
         if split is not None:
             with open(split) as f:
