@@ -6,7 +6,7 @@ import tqdm
 from PIL import Image
 import os
 
-from multiprocessing import Pool,Manager
+from multiprocessing import Pool
    
 file_train_path = "/root/vss/data/vspw/VSPW_480p/train.txt"
 file_test_path = "/root/vss/data/vspw/VSPW_480p/test.txt"
@@ -31,8 +31,6 @@ novel_cls = np.load(r'/root/vss/mmseg/handle_data/group_novel.npy').tolist()
 
 train_class = seen_cls+val_cls
 
-manager = Manager()
-idset=manager.list()
 
 def worker(file_tuple):
     read_path, out_path_file = file_tuple
@@ -76,7 +74,4 @@ if __name__ == "__main__":
                     file_list.append((read_path,out_path_file))
                     
         pool.map(worker,file_list)
-        # idset.sort()
-        # for i in idset:
-        #     print(i)  
         print('done {}'.format(t))
