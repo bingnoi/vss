@@ -198,10 +198,6 @@ class CatClassifier(nn.Module):
         
         clip_finetune = "attention1"
 
-        # self.original_clip = copy.deepcopy(self.clip_model.visual)
-        # for name,params in self.original_clip.named_parameters():
-        #     if clip_finetune == "attention":
-        #         params.requires_grad = True if "attn" in name or "position" in name else False
           
         for name, params in self.clip_model.named_parameters():
             if "visual" in name:
@@ -215,14 +211,6 @@ class CatClassifier(nn.Module):
                     params.requires_grad = False
             else:
                 params.requires_grad = False
-
-    
-        # finetune_backbone = 0.01 > 0.
-        # for name, params in self.backbone.named_parameters():
-        #     if "norm0" in name:
-        #         params.requires_grad = False
-        #     else:
-        #         params.requires_grad = finetune_backbone
         
         self.text_features = zeroshot_classifier(self.class_texts, prompt_templates, clip_model).permute(1, 0,2).float()
         self.text_features_test = zeroshot_classifier(self.test_class_texts, prompt_templates, clip_model).permute(1, 0,2).float()
@@ -257,51 +245,19 @@ class CatClassifier(nn.Module):
                 "PROMPT_CHECKPOINT":"",
                 "CLIP_MODEL_NAME":"ViT-B/16"}
         
-        # cfg = yaml.dump(cfg)
-        # cfg = yaml.safe_load(cfg)
-        # self.prompt_learner = build_prompt_learner(cfg)
-        # self.clip_adapter = MaskFormerClipAdapter(
-        #     "ViT-B/16",
-        #     self.prompt_learner,
-        #     mask_fill="mean",
-        #     mask_expand_ratio=1.0,
-        #     mask_thr=0.5,
-        #     mask_matting=False,
-        #     region_resized=True,
-        # )
         
     def forward(self, ori_images,fuse_f,c4, images_tensor=None, ori_sizes=None):
         assert images_tensor == None
-
-        # ori_images_bert = self.final_cls_token
-        # ori_images_bert = ori_images_bert / ori_images_bert.norm(dim=-1, keepdim=True)
-        # ori_images_bert = ori_images_bert.unsqueeze(1)
-
-        # aux_query_out = aux_query_out
         
         ori_images = torch.cat([ori_images],dim=0)
         ori_images = F.interpolate(ori_images, size=self.clip_resolution, mode='bilinear', align_corners=False)
 
         clip_features = self.clip_model.encode_image(ori_images, dense=True)
 
-        # ori_images_bert = self.clip_model.original_clip(img[-4:],get_embedding=True)
-        # ori_images_bert = ori_images_bert['final_cls_token']
-        # ori_images_bert = ori_images_bert / ori_images_bert.norm(dim=-1, keepdim=True)
-        # ori_images_bert = ori_images_bert.unsqueeze(1)
 
         feature_resolution = [24,24]
         img_feat = rearrange(clip_features[:, 1:, :], "b (h w) c->b c h w", h=feature_resolution[0], w=feature_resolution[1])
         
-        # b,c,h,w = fuse_f[0].shape
-        # for idx,i in enumerate(fuse_f[1:]):
-        #     resize_i = i.reshape(b,h,w,c).permute(0,3,1,2)
-        #     fuse_f[idx+1] = F.interpolate(resize_i,size=self.clip_resolution, mode='bilinear', align_corners=False) 
-        # vis = fuse_f[::-1]
-        
-        # if self.training:
-        #     text = self.clip_adapter([i for i in self.class_texts])
-        # else:
-        #     text = self.clip_adapter([i for i in self.test_class_texts])
         
         text = self.text_features if self.training else self.text_features_test
         text = text.repeat(img_feat.shape[0], 1, 1, 1)
@@ -311,14 +267,6 @@ class CatClassifier(nn.Module):
         o_text = rearrange(o_text,'(b t) d c->b t d c',b=img_feat.shape[0])
         
         text = text + o_text
-        
-        # print('text1',text.shape)
-        # text = text.repeat(img_feat.shape[0], 1, 1, 1)
-        # print('text2',text.shape)
-        
-        # out = self.transformer(img_feat, text, vis)
-        # print(fuse_f.shape,img_feat.shape,c4.shape,text.shape)
-        # torch.Size([4, 256, 60, 60]) torch.Size([4, 512, 24, 24]) torch.Size([1, 5, 512, 15, 15]) torch.Size([4, 111, 80, 512])
         
         out = self.corr(fuse_f,img_feat,c4,text)
         

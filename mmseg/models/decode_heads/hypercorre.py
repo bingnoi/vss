@@ -35,61 +35,11 @@ class CenterPivotConv4d_half(nn.Module):
         return ct_pruned
 
     def forward(self, x):
-        ## x should be size of bsz*s, inch, hb, wb
-
-        # if self.stride[2:][-1] > 1:
-        #     out1 = self.prune(x)
-        # else:
-        #     out1 = x
-        # bsz, inch, ha, wa, hb, wb = out1.size()
-        # out1 = out1.permute(0, 4, 5, 1, 2, 3).contiguous().view(-1, inch, ha, wa)
-        # out1 = self.conv1(out1)
-        # outch, o_ha, o_wa = out1.size(-3), out1.size(-2), out1.size(-1)
-        # out1 = out1.view(bsz, hb, wb, outch, o_ha, o_wa).permute(0, 3, 4, 5, 1, 2).contiguous()
-
-        # bsz, inch, ha, wa, hb, wb = x.size()
         bsz_s, inch, hb, wb = x.size()
         out2 = self.conv2(x)
 
-        # out2 = x.permute(0, 2, 3, 1, 4, 5).contiguous().view(-1, inch, hb, wb)
-        # out2 = self.conv2(out2)
-        # outch, o_hb, o_wb = out2.size(-3), out2.size(-2), out2.size(-1)
-        # out2 = out2.view(bsz, ha, wa, outch, o_hb, o_wb).permute(0, 3, 1, 2, 4, 5).contiguous()
-
-        # if out1.size()[-2:] != out2.size()[-2:] and self.padding[-2:] == (0, 0):
-        #     out1 = out1.view(bsz, outch, o_ha, o_wa, -1).sum(dim=-1)
-        #     out2 = out2.squeeze()
-
-        # y = out1 + out2
         return out2
 
-# [torch.Size([1, 1, 330, 512]), torch.Size([1, 1, 330, 320]), torch.Size([1, 1, 330, 128]), torch.Size([1, 1, 330, 64])]
-
-
-# class Memory(nn.Module):
-#     def __init__(self):
-#         super(Memory, self).__init__()
-#         self.memory_st = nn.Parameter(torch.zeros(1,4,330,512,dtype=torch.float), requires_grad=False)
-#         # self.memory_st = []
-#         # self.memory_st.append(nn.Parameter(torch.zeros(1,4,330,512,dtype=torch.float), requires_grad=False)) 
-#         # self.memory_st.append(nn.Parameter(torch.zeros(1,4,330,320,dtype=torch.float), requires_grad=False)) 
-#         # self.memory_st.append(nn.Parameter(torch.zeros(1,4,330,128,dtype=torch.float), requires_grad=False)) 
-#         # self.memory_st.append(nn.Parameter(torch.zeros(1,4,330,64,dtype=torch.float), requires_grad=False)) 
-
-#     def update(self,feature,ratio,step):
-#         _,_,_,emd = feature.shape
-#         self.memory_st[:,ratio:ratio+1,:,:emd] = ((step-1)/step) * self.memory_st[:,ratio:ratio+1,:,:emd] + (1/step) * feature
-#         # self.memory_st[ratio] = ((step-1)/step) * self.memory_st[ratio] + (1/step) * feature
-
-#     def get(self):
-#         return self.memory_st
-
-#     def forward(self, m_in,ratio,step):  
-#         # in b,1,-1,h,w
-#         # self.memory_st = self.update(m_in,)
-#         self.memory_st[ratio] = ((step-1)/step) * self.memory_st[ratio] + (1/step) * m_in
-
-#         return self.memory_st
 
 class HPNLearner_topk2(nn.Module): 
     def __init__(self, inch, backbone):
@@ -181,11 +131,6 @@ class pooling_mhsa(nn.Module):
 
         self.d_convs = nn.ModuleList([nn.Conv2d(dim, dim, kernel_size=3, stride=1, padding=1, groups=dim) for temp in pool_ratios])
 
-        # self.d_convs1 = nn.ModuleList([nn.Conv2d(embed_dims[0], embed_dims[0], kernel_size=3, stride=1, padding=1, groups=embed_dims[0]) for temp in pool_ratios[0]])
-        # self.d_convs2 = nn.ModuleList([nn.Conv2d(embed_dims[1], embed_dims[1], kernel_size=3, stride=1, padding=1, groups=embed_dims[1]) for temp in pool_ratios[1]])
-        # self.d_convs3 = nn.ModuleList([nn.Conv2d(embed_dims[2], embed_dims[2], kernel_size=3, stride=1, padding=1, groups=embed_dims[2]) for temp in pool_ratios[2]])
-        # self.d_convs4 = nn.ModuleList([nn.Conv2d(embed_dims[3], embed_dims[3], kernel_size=3, stride=1, padding=1, groups=embed_dims[3]) for temp in pool_ratios[3]])
-
     def forward(self,x,redu_ratios):
 
         B, N, C, hy, wy = x.shape
@@ -196,11 +141,6 @@ class pooling_mhsa(nn.Module):
         
         redu_ratios = [2,4,6,8]
         
-        # x_ = x.permute(0, 2, 1).reshape(B, C, H, W)
-        # hy_final = round(hy/redu_ratios[0])+round(hy/redu_ratios[1])+round(hy/redu_ratios[2])+round(hy/redu_ratios[3]) #8,3,4,5
-        # wy_final = round(wy/redu_ratios[0])+round(wy/redu_ratios[1])+round(wy/redu_ratios[2])+round(wy/redu_ratios[3])
-
-        # print("hy_wy ",hy_final,wy_final)
 
         for (l,redu_ratio) in zip(self.d_convs,redu_ratios):
 
@@ -236,13 +176,6 @@ class hypercorre_topk2(nn.Module):
         super().__init__()
         self.stack_id=stack_id
         self.dim=dim
-        # self.num_qkv=2
-        # self.qkv_bias=qkv_bias
-        # self.qkv0 = nn.Linear(dim[0], dim[0] * self.num_qkv, bias=qkv_bias)
-        # self.qkv1 = nn.Linear(dim[1], dim[1] * self.num_qkv, bias=qkv_bias)
-        # self.qkv2 = nn.Linear(dim[2], dim[2] * self.num_qkv, bias=qkv_bias)
-        # self.qkv3 = nn.Linear(dim[3], dim[3] * self.num_qkv, bias=qkv_bias)
-        # self.q = nn.Linear(dim, dim , bias=qkv_bias)
         self.q1 = nn.Linear(dim[0], dim[0], bias=qkv_bias)
         self.q2 = nn.Linear(dim[1], dim[1], bias=qkv_bias)
         self.q3 = nn.Linear(dim[2], dim[2], bias=qkv_bias)
@@ -268,40 +201,17 @@ class hypercorre_topk2(nn.Module):
         self.pooling_mhsa_fk2 = pooling_mhsa(dim[2])
         self.pooling_mhsa_fk1 = pooling_mhsa(dim[3])
 
-        # self.pooling_mhsa_fv4 = pooling_mhsa(dim[0])
-        # self.pooling_mhsa_fv3 = pooling_mhsa(dim[1])
-        # self.pooling_mhsa_fv2 = pooling_mhsa(dim[2])
-        # self.pooling_mhsa_fv1 = pooling_mhsa(dim[3])
 
         self.pooling_mhsa_sk4 = pooling_mhsa(dim[0])
         self.pooling_mhsa_sk3 = pooling_mhsa(dim[1])
         self.pooling_mhsa_sk2 = pooling_mhsa(dim[2])
         self.pooling_mhsa_sk1 = pooling_mhsa(dim[3])
 
-        # self.pooling_mhsa_sv4 = pooling_mhsa(dim[0])
-        # self.pooling_mhsa_sv3 = pooling_mhsa(dim[1])
-        # self.pooling_mhsa_sv2 = pooling_mhsa(dim[2])
-        # self.pooling_mhsa_sv1 = pooling_mhsa(dim[3])
 
         self.pooling_mhsa_f4 = pooling_mhsa(dim[0])
         self.pooling_mhsa_f3 = pooling_mhsa(dim[1])
         self.pooling_mhsa_f2 = pooling_mhsa(dim[2])
         self.pooling_mhsa_f1 = pooling_mhsa(dim[3])
-
-        # self.pooling_mhsa_fs4 = pooling_mhsa(dim[0])
-        # self.pooling_mhsa_fs3 = pooling_mhsa(dim[1])
-        # self.pooling_mhsa_fs2 = pooling_mhsa(dim[2])
-        # self.pooling_mhsa_fs1 = pooling_mhsa(dim[3])
-
-        # self.pooling_mhsa_fss4 = pooling_mhsa(dim[0])
-        # self.pooling_mhsa_fss3 = pooling_mhsa(dim[1])
-        # self.pooling_mhsa_fss2 = pooling_mhsa(dim[2])
-        # self.pooling_mhsa_fss1 = pooling_mhsa(dim[3])
-
-        # self.pooling_mhsa_fsq4 = pooling_mhsa(dim[0])
-        # self.pooling_mhsa_fsq3 = pooling_mhsa(dim[1])
-        # self.pooling_mhsa_fsq2 = pooling_mhsa(dim[2])
-        # self.pooling_mhsa_fsq1 = pooling_mhsa(dim[3])
         
 
         self.f4 = nn.Linear(dim[0], dim[0], bias=qkv_bias)
@@ -334,15 +244,6 @@ class hypercorre_topk2(nn.Module):
         self.f2p = nn.Linear(dim[2], dim[2], bias=qkv_bias)
         self.f1p = nn.Linear(dim[3], dim[3], bias=qkv_bias)
 
-        # self.f4pv = nn.Linear(dim[0], dim[0], bias=qkv_bias)
-        # self.f3pv = nn.Linear(dim[1], dim[1], bias=qkv_bias)
-        # self.f2pv = nn.Linear(dim[2], dim[2], bias=qkv_bias)
-        # self.f1pv = nn.Linear(dim[3], dim[3], bias=qkv_bias)
-
-        # self.f4psv = nn.Linear(dim[0], dim[0], bias=qkv_bias)
-        # self.f3psv = nn.Linear(dim[1], dim[1], bias=qkv_bias)
-        # self.f2psv = nn.Linear(dim[2], dim[2], bias=qkv_bias)
-        # self.f1psv = nn.Linear(dim[3], dim[3], bias=qkv_bias)
         
         dim_c = 1024
         
@@ -383,33 +284,9 @@ class hypercorre_topk2(nn.Module):
         query_qkv_all=[]
         query_shape_all=[]
         
-        # print('check2',[i.shape for i in query_frame])
-        # exit()
-
-        # B,num_clips,cx,hx,wx=query_frame[0].shape
-        # query_frame_selected = query_frame[0].permute(0,1,3,4,2).reshape(B,num_clips,-1,cx)
-
-        # query_frame_selected = self.linear1(query_frame_selected)
-        # memory_feature = self.linear2(self.memory.data.permute(0,1,3,4,2)).reshape(B,num_clips,-1,cx)
-
-        # # torch.Size([1, 3, 225, 512]) torch.Size([1, 3, 512, 225])
-        
-        # atten = torch.matmul(memory_feature,query_frame_selected.transpose(-1,-2))
-
-        # #[1,3,225,225]*[1,3,225,512] = [1,3,225,512]
-        # out = torch.matmul(atten,query_frame_selected).reshape(B,num_clips,hx,wx,cx).permute(0,1,4,2,3)
-        
-        # self.memory.data = out
-        # query_frame[0] = out
 
         for ii, query in enumerate(query_frame):
             if ii==0:
-                # print('query cx1 %d %d %d %d %d'%(B,num_ref_clips,cx,hy,wy))
-                # query=self.pooling_mhsa_k4(query,[1,2,3,4])
-                # print('sksksk',query.permute(0,1,3,4,2).shape)
-                # print('tttttt',self.dim[3])
-                # normal sksksk torch.Size([1, 3, 15, 27, 512])
-                # print(query.permute(0,1,3,4,2).shape,self.dim[3])
                 query_qkv=self.k4(query.permute(0,1,3,4,2)) #1 3 512 15 15
 
                 # query_key=self.k4(query.permute(0,1,3,4,2))
@@ -429,13 +306,6 @@ class hypercorre_topk2(nn.Module):
                 # query=self.pooling_mhsa_k1(query,[8,16,24,32])
                 query_qkv=self.k1(query.permute(0,1,3,4,2)) #1 3 64 120 120
 
-                # query_key=self.k1(query.permute(0,1,3,4,2))
-                # print('query cx4 %d %d %d %d %d'%(B,num_ref_clips,cx,hy,wy))
-                
-                ## skip h/4*w/4 feature because it is too big
-                # query_qkv_all.append(None)
-                # query_shape_all.append([None,None])
-                # continue
             B,num_ref_clips,cx,hx,wx=query.shape
             # B,num_ref_clips,cx,hx,wx=query.shape
 
@@ -444,69 +314,32 @@ class hypercorre_topk2(nn.Module):
             query_shape_all.append([hx,wx])
             # query_shape_all.append(wy)
 
-
-        # print("k",[i.shape for i in query_qkv_all])
-        # [torch.Size([1, 3, 330, 512]), torch.Size([1, 3, 330, 320]), torch.Size([1, 3, 330, 128]), torch.Size([1, 3, 330, 64])] 
-       
         supp_qkv_all=[]
         supp_shape_all=[]
         
         for ii, supp in enumerate(supp_frame): #B,N,-1,C
             if ii==0:
-                # print('supp cx1 %d %d %d %d %d'%(B,num_ref_clips,cx,hy,wy))
-                # supp=self.pooling_mhsa_k4(supp,[1/2,1/2,1/2,1/2])
-                # supp=supp.permute(0,1,4,2,3)
                 supp_qkv=self.q4(supp.permute(0,1,3,4,2)) #1 1 512 15 15
                 # supp_qkv=self.q4(supp)
             elif ii==1: 
-                # supp=self.pooling_mhsa_k3(supp,[1,1,1,1])
-                # supp=supp.permute(0,1,4,2,3)
-                # # print('supp cx2 %d %d %d %d %d'%(B,num_ref_clips,cx,hy,wy))
                 supp_qkv=self.q3(supp.permute(0,1,3,4,2)) #1 1 320 30 30 
                 # supp_qkv=self.q3(supp)
             elif ii==2:
-                # supp=self.pooling_mhsa_k2(supp,[2,2,2,2])
-                # supp=supp.permute(0,1,4,2,3)
-                # # print('supp cx3 %d %d %d %d %d'%(B,num_ref_clips,cx,hy,wy))
                 supp_qkv=self.q2(supp.permute(0,1,3,4,2)) #1 1 128 60 60
                 # supp_qkv=self.q2(supp)
             elif ii==3:
-                # print('supp cx4 %d %d %d %d %d'%(B,num_ref_clips,cx,hy,wy))
-                # print("inner ",supp.shape)
-                # supp=self.pooling_mhsa_k1(supp,[4,4,4,4])
-                # supp=supp.permute(0,1,4,2,3)
                 supp_qkv=self.q1(supp.permute(0,1,3,4,2)) #1 1 64 120 120
-                # supp_qkv_all.append(None)
-                # supp_shape_all.append([None,None])
-                # continue
-                # supp_qkv=self.q1(supp)
+
 
             B,num_ref_clips,cx,hx,wx=supp.shape
-            # B,num_ref_clips,wx,cx=supp.shape
 
-
-            # supp_qkv_all.append(supp_qkv.reshape(B,num_ref_clips,hx*wx,cx))    ## B,num_ref_clips,hx*wx,cx
-            # supp_shape_all.append([hx,wx])
             supp_qkv_all.append(supp_qkv.reshape(B,num_ref_clips,hx*wx,cx))    ## B,num_ref_clips,hx*wx,cx
             supp_shape_all.append([hx,wx])
             # supp_shape_all.append([hx,wx])
 
-        # print("q",[i.shape for i in supp_qkv_all])
-        # [torch.Size([1, 1, 225, 512]), torch.Size([1, 1, 900, 320]), torch.Size([1, 1, 3600, 128]), torch.Size([1, 1, 14400, 64])]
-        # a=input()
-
-        # [torch.Size([1, 1, 330, 512]), torch.Size([1, 1, 330, 320]), torch.Size([1, 1, 330, 128]), torch.Size([1, 1, 330, 64])]
 
         loca_selection=[]
         indices_sele=[]
-        # k_top=5
-        # threh=0.5
-        # print(threh,k_top)
-
-        # query_qkv_all=query_qkv_all[::-1]
-        # query_shape_all=query_shape_all[::-1]
-        # supp_qkv_all=supp_qkv_all[::-1]
-        # supp_shape_all=supp_shape_all[::-1]
         atten_all=[]
         s_all=[]
 
@@ -537,24 +370,6 @@ class hypercorre_topk2(nn.Module):
 
         p_features = []
         p1_features = []
-
-        # last1_features = []
-        # last1_features.append(self.pooling_mhsa_fsq1(query_frame[0][:,0:1],[1,2,3,4]))
-        # last1_features.append(self.pooling_mhsa_fsq2(query_frame[1][:,0:1],[2,4,6,8]))
-        # last1_features.append(self.pooling_mhsa_fsq3(query_frame[2][:,0:1],[4,8,12,16]))
-        # last1_features.append(self.pooling_mhsa_fsq4(query_frame[3][:,0:1],[8,16,24,32]))
-
-        # last1_features_cat = torch.cat(last1_features,dim=3)
-        
-        # p1_features.append(self.pooling_mhsa_fsq1(query_frame[0][:,2:3],[1,2,3,4]))
-        # p1_features.append(self.pooling_mhsa_fsq2(query_frame[1][:,2:3],[2,4,6,8]))
-        # p1_features.append(self.pooling_mhsa_fsq3(query_frame[2][:,2:3],[4,8,12,16]))
-        # p1_features.append(self.pooling_mhsa_fsq4(query_frame[3][:,2:3],[8,16,24,32]))
-
-        # last3_features_cat = torch.cat(p1_features,dim=3)
-        
-        # if not self.training:
-        #     ratio=5
 
         intermediate_weight_f1 = []
         intermediate_weight_f2 = []
@@ -591,12 +406,8 @@ class hypercorre_topk2(nn.Module):
                     last_feature_v=self.f4p(last_feature)
                     last_features_cat6.append(last_feature_v)
 
-                # print('qqqkkk',ii,fi,query_qkv_all[ii][:,fi-1:fi].shape,last_feature_p.transpose(2,3).shape)
                 step_atten = torch.matmul(query_qkv_all[ii][:,fi:fi+1],last_feature_p.transpose(2,3).unsqueeze(1)) #qk
-                # step_atten = torch.matmul(query_qkv_all[ii][:,fi:fi+1],query_qkv_all[ii][:,fi-1:fi].transpose(2,3).unsqueeze(1)) #qk
 
-
-                # store intermediate atten for hpn
 
                 if fi == 1:
                     step_atten_1.append(step_atten)
@@ -606,15 +417,6 @@ class hypercorre_topk2(nn.Module):
 
                 if fi == 1:
                     qkv = torch.matmul(step_atten,last_feature_v.unsqueeze(1))
-                    # if  ii == 0:
-                    #     qkv = torch.matmul(step_atten,last_feature_f1.unsqueeze(1))
-                    # elif ii == 1:
-                    #     qkv = torch.matmul(step_atten,last_feature_f2.unsqueeze(1))
-                    # elif ii == 2:
-                    #     qkv = torch.matmul(step_atten,last_feature_f3.unsqueeze(1))
-                    # else:
-                    #     qkv = torch.matmul(step_atten,last_feature_f4.unsqueeze(1))
-                    # intermediate_weight_f1.append(qkv)
                 else:
                     qkv = torch.matmul(step_atten,last_feature_v.unsqueeze(1))
                     # intermediate_weight_f2.append(qkv)
@@ -647,39 +449,6 @@ class hypercorre_topk2(nn.Module):
 
             from_t.append(qkv)
 
-
-
-        # 这里是t-6特征的融合
-        # pooling_fs1 = self.pooling_mhsa_fs1(last_features_cat6[0].permute(0,1,4,2,3),[1,2,3,4])
-        # pooling_fs2 = self.pooling_mhsa_fs2(last_features_cat6[1].permute(0,1,4,2,3),[2,4,6,8])
-        # pooling_fs3 = self.pooling_mhsa_fs3(last_features_cat6[2].permute(0,1,4,2,3),[4,8,12,16])
-        # pooling_fs4 = self.pooling_mhsa_fs4(last_features_cat6[3].permute(0,1,4,2,3),[8,16,24,32])
-
-        # pooling_fs1 = self.pooling_mhsa_fs1(atten_store_1[0].permute(0,1,4,2,3),[1,2,3,4])
-        # pooling_fs2 = self.pooling_mhsa_fs2(atten_store_1[1].permute(0,1,4,2,3),[2,4,6,8])
-        # pooling_fs3 = self.pooling_mhsa_fs3(atten_store_1[2].permute(0,1,4,2,3),[4,8,12,16])
-        # pooling_fs4 = self.pooling_mhsa_fs4(atten_store_1[3].permute(0,1,4,2,3),[8,16,24,32])
-
-        # pooling_fs1 = self.f1pv(pooling_fs1)
-        # pooling_fs2 = self.f2pv(pooling_fs2)
-        # pooling_fs3 = self.f3pv(pooling_fs3)
-        # pooling_fs4 = self.f4pv(pooling_fs4)
-        
-        # # 这里是t-3特征的融合
-        # pooling_fss1 = self.pooling_mhsa_fs1(last_features_cat3[0].permute(0,1,4,2,3),[1,2,3,4])
-        # pooling_fss2 = self.pooling_mhsa_fs2(last_features_cat3[1].permute(0,1,4,2,3),[2,4,6,8])
-        # pooling_fss3 = self.pooling_mhsa_fs3(last_features_cat3[2].permute(0,1,4,2,3),[4,8,12,16])
-        # pooling_fss4 = self.pooling_mhsa_fs4(last_features_cat3[3].permute(0,1,4,2,3),[8,16,24,32])
-
-        # pooling_fss1 = self.pooling_mhsa_fss1(atten_store_2[0].permute(0,1,4,2,3),[1,2,3,4])
-        # pooling_fss2 = self.pooling_mhsa_fss2(atten_store_2[1].permute(0,1,4,2,3),[2,4,6,8])
-        # pooling_fss3 = self.pooling_mhsa_fss3(atten_store_2[2].permute(0,1,4,2,3),[4,8,12,16])
-        # pooling_fss4 = self.pooling_mhsa_fss4(atten_store_2[3].permute(0,1,4,2,3),[8,16,24,32])
-
-        # pooling_fss1 = self.f1psv(pooling_fss1)
-        # pooling_fss2 = self.f2psv(pooling_fss2)
-        # pooling_fss3 = self.f3psv(pooling_fss3)
-        # pooling_fss4 = self.f4psv(pooling_fss4)
 
         atten_feature_f1 = torch.cat([last_features_cat6[0],last_features_cat6[1],last_features_cat6[2],last_features_cat6[3]],dim=3)
         atten_feature_f2 = torch.cat([last_features_cat3[0],last_features_cat3[1],last_features_cat3[2],last_features_cat3[3]],dim=3)
@@ -718,20 +487,8 @@ class hypercorre_topk2(nn.Module):
         for ii in range(0,4):
             hx,wx=supp_shape_all[ii]
 
-            # print("check",supp_qkv_all[ii].shape,from_t_m[ii].transpose(2,3).shape)
-            # check torch.Size([1, 1, 225, 512]) torch.Size([1, 1, 512, 330])
-            # check torch.Size([1, 1, 900, 320]) torch.Size([1, 1, 320, 330])
-            # check torch.Size([1, 1, 3600, 128]) torch.Size([1, 1, 128, 330])
-            # check torch.Size([1, 1, 14400, 64]) torch.Size([1, 1, 64, 330]) 14400*330 330*64
-
-
             # t帧和t-9做融合
             atten = torch.matmul(supp_qkv_all[ii],from_t_m[ii].transpose(2,3)) #q,t0
-
-            # atten = torch.matmul(from_t_m[ii],supp_qkv_all[ii].transpose(2,3)) #q,t0
-            # atten1 = torch.matmul(pooling_fs[ii],supp_qkv_all[ii].transpose(2,3))
-            # print('atten',atten.shape)
-            # print('atten1',step_atten_1[ii].shape)
 
             hs = atten.shape[-1]
 
@@ -742,14 +499,6 @@ class hypercorre_topk2(nn.Module):
             atten_all.append(final_feature.unsqueeze(1))
             atten_all1.append(final_feature_1.unsqueeze(1))
             atten_all2.append(final_feature_2.unsqueeze(1))
-            # atten_all1.append(final_feature1.unsqueeze(1))
-            # final_m_feature = torch.matmul(atten,from_t[ii])
-            # # with torch.no_grad():
-            # #     self.memory.update(last_feature,ii,4)
-            # after_t.append(final_m_feature)
-        
-        # print('kk',[a.shape for a in atten_all])
-        # [torch.Size([330, 1, 15, 15]), torch.Size([330, 1, 30, 30]), torch.Size([330, 1, 60, 60]), torch.Size([330, 1, 120, 120])]
 
         atten_all = self.hpn(atten_all)
         atten_all1 = self.hpn1(atten_all1)
@@ -764,143 +513,10 @@ class hypercorre_topk2(nn.Module):
         atten_feature_f1 = self.pooling_proj_linear_1(atten_feature_f1)
         atten_feature_f2 = self.pooling_proj_linear_2(atten_feature_f2)
 
-        # print('qq',atten_all.shape,former_t_feature.shape)
-        # torch.Size([1, 1, 3600, 330]) torch.Size([1, 1, 330, 256]) --> [1,1,3600,256]
 
         atten_weight = torch.matmul(atten_all,former_t_feature)
         atten_weight_1 = torch.matmul(atten_all1,atten_feature_f1)
         atten_weight_2 = torch.matmul(atten_all2,atten_feature_f2)
 
-        # query_frame_p = self.linear1(self.memory,dim=0)
         
-        # [1,1,3600,256]
-
-        # st_final = []
-        # for ii in range(0,4):
-        #     atten_w = torch.matmul(p_features[ii],pooling_t[ii].transpose(-1,-2))
-        #     st_final.append(torch.matmul(atten_w,pooling_t[ii]))
-
-        # pooling_f = st_final
-
-        # atten ends here!!!
-        
-
-        # for ii in range(0,len(supp_frame)):
-        #     fs=query_shape_all[ii]
-        #     hx,wx=supp_shape_all[ii]
-        #     # B,num_ref_clips,hx*wx,cx   B,num_ref_clips,cx,fs
-        #     # print('supp-query',supp_qkv_all[ii].shape,query_qkv_all[ii].transpose(2,3).shape)
-        #     atten=torch.matmul(supp_qkv_all[ii], query_qkv_all[ii].transpose(2,3)) # B*(num_clips-1)*(hx*wx)*fs
-        #     # s=atten.shape[3]
-        #     # print("here: ", atten.shape, atten.max(), atten.min())
-
-        #     atten=atten.permute(0,1,3,2).reshape(B*q_num_ref*fs,hx,wx)   ## (B*(num_clips-1)*s)*hy*wy
-        #     atten_all.append(atten.unsqueeze(1)) ## (B*(num_clips-1)*s)*1*hx*wx
-        #     s_all.append(fs)
-
-        # print('atten_all',[i.shape for i in atten_all])
-        # # [torch.Size([990, 1, 15, 15]), torch.Size([990, 1, 30, 30]), torch.Size([990, 1, 60, 60]), torch.Size([990, 1, 120, 120])]
-
-
-        # for ii in range(0,len(supp_frame)-1):
-        #     hy,wy=query_shape_all[ii]
-        #     hx,wx=supp_shape_all[ii]
-        #     if ii==0:
-        #         atten=torch.matmul(supp_qkv_all[ii], query_qkv_all[ii].transpose(2,3))    ## B*(num_clips-1)*(hx*wx)*(hy*wy)
-        #         atten_fullmatrix=atten #1,3,225,225
-        #         # print('inital atten',atten_fullmatrix.shape)
-        #     else:
-        #         cx=query_qkv_all[ii].shape[-1]
-        #         query_selected=query_qkv_all[ii]  ## B*(num_clips-1)*(hy*wy)*c
-        #         assert query_selected.shape[:-1]==loca_selection[ii-1].shape     
-                
-        #         num_selection=torch.unique((loca_selection[ii-1]).sum(2))
-        #         assert num_selection.shape[0]==1 and num_selection.dim()==1
-        #         # query_selected=torch.masked_select(querry_selected, loca_selection[ii-2].unsqueeze(-1))
-        #         query_selected=query_selected[loca_selection[ii-1]>0.5].reshape(B, q_num_ref, int(num_selection[0]),cx)     ##  B*(num_clips-1)*s*c
-
-        #         atten=torch.matmul(supp_qkv_all[ii], query_selected.transpose(2,3))    ## B*(num_clips-1)*(hx*wx)*(s)
-        #         # atten_fullmatrix=-100*torch.ones(B,q_num_ref,atten.shape[2],(query_shape_all[ii][0]*query_shape_all[ii][1])).cuda()
-        #         # indices=indices_sele[ii-1]
-        #         # assert indices.shape[-1]==num_selection[0]
-        #         # indices=indices.unsqueeze(2).expand(B,q_num_ref,atten.shape[2],indices.shape[-1])    ## B*(num_clips-1)*(hx*wx)*(s)
-        #         # atten_fullmatrix=atten_fullmatrix.scatter(3,indices,atten)
-        #     if ii==0:
-        #         # atten_temp=atten.reshape(B*atten.shape[1],hx*wx,query_shape_all[ii][0],query_shape_all[ii][1])
-        #         # atten_topk=F.interpolate()
-        #         atten_topk=torch.topk(atten_fullmatrix,self.k_top,dim=2)[0]    # B*(num_clips-1)*(k)*(hy*wy)
-        #         atten_topk=atten_topk.sum(2)   # B*(num_clips-1)*(hy*wy)
-        #         # atten_kthvalue=torch.kthvalue(atten_topk,atten_topk.shape[-1]*threh,dim=2)[0]   # 
-        #         # topk_mask=atten_topk>atten_kthvalue   # B*(num_clips-1)*(hy*wy)
-        #         # topk_mask=topk_mask.reshape(B, topk_mask.shape[1], hy, wy)  # B*(num_clips-1)*hy*wy
-        #         # s=int(hy*wy*threh)
-        #         # indices=torch.topk(atten_topk,s,dim=2)[1]    # B*(num_clips-1)*s
-        #         # topk_mask=torch.zeros_like(atten_topk)
-        #         # topk_mask=topk_mask.scatter(2,indices,1)    # B*(num_clips-1)*(hy*wy)
-        #         # atten=atten[topk_mask.unsqueeze(2).expand_as(atten)>0.5].reshape(B,q_num_ref,hx*wx,s)
-
-        #         # topk_mask=topk_mask.reshape(B, q_num_ref, hy, wy)
-                
-        #         hy_next, wy_next=query_shape_all[ii+1]
-
-        #         # print("hy next",hy_next,wy_next,hy,wy)
-
-        #         if hy_next==hy and wy_next==wy:
-        #             s=int(hy*wy*self.threh)
-        #             indices=torch.topk(atten_topk,s,dim=2)[1]    # B*(num_clips-1)*s
-        #             topk_mask=torch.zeros_like(atten_topk)
-        #             topk_mask=topk_mask.scatter(2,indices,1)    # B*(num_clips-1)*(hy*wy)
-        #             atten=atten[topk_mask.unsqueeze(2).expand_as(atten)>0.5].reshape(B,q_num_ref,hx*wx,s)
-
-        #         else:   # hy_next!=hy or wy_next!=wy
-        #             atten=atten.reshape(B*q_num_ref,hx*wx,hy,wy)
-        #             atten=F.interpolate(atten, (hy_next, wy_next), mode='bilinear', align_corners=False).reshape(B,q_num_ref,hx*wx,hy_next*wy_next)
-
-        #             atten_topk=atten_topk.reshape(B,q_num_ref,hy,wy)    # B*(num_clips-1)*hy*wy
-        #             atten_topk=F.interpolate(atten_topk, (hy_next, wy_next), mode='bilinear', align_corners=False)    # B*(num_clips-1)*hy_next*wy_next
-        #             atten_topk=atten_topk.reshape(B, q_num_ref, hy_next*wy_next)   # B*(num_clips-1)*(hy_next*wy_next)
-
-        #             s=int(hy_next*wy_next*self.threh)
-        #             indices=torch.topk(atten_topk,s,dim=2)[1]    # # B*(num_clips-1)*s
-        #             topk_mask=torch.zeros_like(atten_topk)
-        #             topk_mask=topk_mask.scatter(2,indices,1)    # B*(num_clips-1)*(hy_next*wy_next)
-
-        #             atten=atten[topk_mask.unsqueeze(2).expand_as(atten)>0.5].reshape(B,q_num_ref,hx*wx,s)
-        #             # topk_mask=topk_mask.reshape(B, topk_mask.shape[1], hy_next, wy_next)
-        #         # topk_mask=topk_mask.reshape(B, topk_mask.shape[1], query_shape_all[ii][0], query_shape_all[ii][1])  # B*(num_clips-1)*hy*wy
-        #         # loca_selection[ii-1]=F.interpolate(topk_mask, query_shape_all[ii], mode='nearest', align_corners=False)>0.5
-        #         loca_selection.append(topk_mask) ## B*(num_clips-1)*(hy*wy)
-        #         # indices_sele[0]=indices
-        #     elif ii<=len(supp_frame)-3:
-        #         # print("iiiiiiii ",len(supp_frame)-3)
-        #         loca_selection.append(loca_selection[-1])
-
-        #     # print("len",len(loca_selection))
-        #     # print("loca[0]",loca_selection[0].shape)
-
-        #     s=atten.shape[3]
-        #     # print("here: ", atten.shape, atten.max(), atten.min())
-        #     atten=atten.permute(0,1,3,2).reshape(B*q_num_ref*s,hx,wx)   ## (B*(num_clips-1)*s)*hx*wx
-        #     atten_all.append(atten.unsqueeze(1))
-        #     s_all.append(s)
-        #         print(atten.shape) # [60, 60, 30, 30],[30, 30, 30, 30],[15, 15, 15, 15]
-        # print(len(atten_all))
-        # print("atten",len(atten_all))
-        # print("atten size",atten_all[0].shape)
-        # print("s_all",len(s_all))
-        # print("s_all size",s_all[0])
-
-
-        # atten_all=self.hpn(atten_all)
-        # print('atten',[i.shape for i in atten_all])
-        # start_time2=time.time()
-        # # B,num_ref_clips,_,_,_=query_frame[0].shape
-        # # atten_new=atten_new.reshape(B,num_ref_clips,atten_new.shape[-2],atten_new.shape[-1])
-        # # atten_all=[atten_one.squeeze(1).reshape(B,q_num_ref,s_all[i],supp_shape_all.shape[0],supp_shape_all.shape[1]).permute(0,1,3,4,2) for i,atten_one in enumerate(atten_all)]
-        # atten_all=atten_all.squeeze(1).reshape(B,q_num_ref,s_all[-1],supp_shape_all[2][0]*supp_shape_all[2][1]).permute(0,1,3,2)   # B*(num_clips-1)*(hx*wx)*fs
-        
-        # # return atten_all, loca_selection[-1]>0.5
-        # return atten_all
-
-        # according to t-6  t-3  t
         return [atten_weight_1,atten_weight_2,atten_weight]

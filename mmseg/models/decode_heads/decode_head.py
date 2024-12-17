@@ -496,9 +496,8 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             try:
                 padded_masks[:, : gt_masks.shape[1], : gt_masks.shape[2]] = gt_masks
             except:
-                print("sss",padded_masks.shape,gt_masks.shape)
+                print(padded_masks.shape,gt_masks.shape)
 
-            # print('ffff',targets_per_image['gt_classes'].device,padded_masks.device)
             new_targets.append(
                 {
                     "labels": targets_per_image['gt_classes'],
@@ -506,119 +505,11 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                 }
             )
         
-        # print("ss",[(i['labels'].shape,i['masks'].shape) for i in new_targets])
-        # exit()
         return new_targets
 
     @force_fp32(apply_to=('seg_logit', ))
     def losses(self, seg_logit, images,seg_label):
         """Compute segmentation loss."""
-        
-        # targets = seg_label.squeeze()
-        # outputs = F.interpolate(seg_logit, size=(targets.shape[-2], targets.shape[-1]), mode="bilinear", align_corners=False)
-        
-        # num_classes = outputs.shape[1]
-        # mask = targets != 255
-        
-        # # print('ck',targets.shape,mask.shape)
-        
-        # outputs = outputs.permute(0,2,3,1)
-        # _targets = torch.zeros(outputs.shape, device=outputs.device)
-        # # print(outputs.shape,num_classes,targets.shape)
-        # _onehot = F.one_hot(targets[mask], num_classes=num_classes).float()
-        # _targets[mask] = _onehot
-        
-        # loss = F.binary_cross_entropy_with_logits(outputs, _targets)
-        # losses = {"loss_sem_seg" : loss}
-        # return losses
-        
-        
-        
-        # ins_data = []
-        # # print("sp",seg_label.shape)
-        # # exit()
-        # b,n,_,h,w = seg_label.shape
-        # seg_label = seg_label.reshape(b*n,_,h,w)
-        # split_group = torch.split(seg_label,split_size_or_sections=1,dim=0)
-        # # print("ssk",seg_label.shape,[i.shape for i in split_group])
-        # for i_label in split_group:
-        #     sem_seg_gt = i_label
-        #     sem_seg = sem_seg_gt.cpu().numpy()
-        #     classes = np.unique(sem_seg)
-        #     classes = classes[classes != self.ignore_index]
-            
-        #     gt_classes = torch.tensor(classes,dtype=torch.int64)
-        #     masks = []
-        #     for class_id in classes:
-        #         masks.append(sem_seg == class_id)
-        #         # print("see",class_id,np.count_nonzero(sem_seg == class_id))
-        #     # exit()
-        #     if len(masks) == 0:
-        #         gt_mask = torch.zeros((0, sem_seg.shape[-2], sem_seg.shape[-1]))
-        #     else:
-        #         gt_mask = torch.stack([torch.from_numpy(np.ascontiguousarray(x.copy())) for x in masks])
-        
-        #     ins = {}
-            
-        #     gt_classes = gt_classes.to('cuda' if torch.cuda.is_available() else 'cpu')
-        #     gt_mask = gt_mask.to('cuda' if torch.cuda.is_available() else 'cpu').squeeze()
-            
-            
-        #     if len(gt_mask.shape) < 3:
-        #         gt_mask=gt_mask.unsqueeze(0)
-            
-        #     ins['gt_classes'] = gt_classes
-        #     ins['gt_masks'] = gt_mask
-            
-        #     # print(gt_classes)
-            
-        #     ins_data.append(ins)
-        
-        # # exit()
-        # mask_weight = 20
-        # dice_weight = 1
-        # deep_supervision = True
-        # no_object_weight =0.1
-        
-        # matcher = HungarianMatcher(
-        #     cost_class=1,
-        #     cost_mask=mask_weight,
-        #     cost_dice=dice_weight,
-        # )
-        # weight_dict = {"loss_ce": 1, "loss_mask": mask_weight, "loss_dice": dice_weight}
-        # if deep_supervision:
-        #     dec_layers = 6
-        #     aux_weight_dict = {}
-        #     for i in range(dec_layers - 1):
-        #         aux_weight_dict.update({k + f"_{i}": v for k, v in weight_dict.items()})
-        #     weight_dict.update(aux_weight_dict)
-        
-        # losses = ["labels", "masks"]
-        # self.criterion = SetCriterion(
-        #     111,
-        #     matcher=matcher,
-        #     weight_dict=weight_dict,
-        #     eos_coef=no_object_weight,
-        #     losses=losses,
-        # )
-        
-        # targets = self.prepare_targets(ins_data,images)
-        
-        # # seg_logit['pred_logits'] = seg_logit['pred_logits'].to('cpu')
-        # # seg_logit['pred_masks']=seg_logit['pred_masks'].to('cpu')
-        
-        # # print("kk",seg_logit['pred_logits'].shape,seg_logit['pred_masks'].shape)
-        # # exit()
-        # losses = self.criterion(seg_logit,targets)
-        
-        # for k in list(losses.keys()):
-        #     if k in self.criterion.weight_dict:
-        #         losses[k] *= self.criterion.weight_dict[k]
-        #     else:
-        #         # remove this loss if not specified in `weight_dict`
-        #         losses.pop(k)
-
-        # return losses
         
         
         loss = dict()
@@ -637,11 +528,6 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             # print(seg_label[:,-1].shape)
             seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips,1,h,w).reshape(batch_size*(num_clips),1,h,w)
         elif self.hypercorre:
-            # print("here2")
-            # print(self.self_ensemble2,seg_logit.shape,seg_label.shape)
-            
-            # if self.self_ensemble2 and seg_logit.shape[1]==2*seg_label.shape[1]:
-            # if self.self_ensemble2 and seg_logit.shape[1]==seg_label.shape[1] + 4:
             if self.self_ensemble2 and seg_logit.shape[1]==seg_label.shape[1] :
 
                 # assert seg_logit.shape[1]==2*seg_label.shape[1]
@@ -651,18 +537,12 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
                 batch_size, _, _, h ,w=seg_logit_ori.shape
 
                 seg_logit_ori=seg_logit_ori.reshape(batch_size*(num_clips),-1,h,w)
-                # seg_logit_last3frame=seg_logit[:,num_clips:-1].reshape(batch_size*(num_clips_last-1),-1,h,w)
-                # seg_logit_lastframe = seg_logit[:,-1:].reshape(batch_size,-1,h,w)
 
                 batch_size, num_clips, chan, h ,w=seg_label.shape
 
                 assert chan==1
                 seg_label_ori=seg_label.reshape(batch_size*(num_clips),1,h,w)
 
-                # seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips,1,h,w).reshape(batch_size*(num_clips),1,h,w)
-                # seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips_last,1,h,w).reshape(batch_size*(num_clips_last),1,h,w)
-
-                # seg_label_lastframe=seg_label[:,-1:].expand(batch_size,num_clips_last,1,h,w).reshape(batch_size*(num_clips_last),1,h,w)
                 
                 seg_label_last3frame = seg_label[:,:-1].reshape(batch_size*(num_clips_last-1),-1,h,w)
                 seg_label_lastframe = seg_label[:,-1:].reshape(batch_size,-1,h,w)
@@ -679,9 +559,6 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             else:
                 assert False, "parameters not correct"            
 
-        # print('l',seg_logit_ori.shape, seg_logit_lastframe.shape)
-
-        # print('m',seg_label_ori.shape, seg_label_lastframe.shape)
 
         # 一个是x,剩下那个是out1...4
         # print(seg_logit_ori.shape,seg_label.shape)
@@ -691,32 +568,12 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             mode='bilinear',
             align_corners=self.align_corners)
 
-        # seg_logit_last3frame = resize(
-        #     input=seg_logit_last3frame,
-        #     size=seg_label.shape[3:],
-        #     mode='bilinear',
-        #     align_corners=self.align_corners)
-
-        # seg_logit_lastframe = resize(
-        #     input=seg_logit_lastframe,
-        #     size=seg_label.shape[3:],
-        #     mode='bilinear',
-        #     align_corners=self.align_corners)
-
         if self.sampler is not None:
             seg_weight = self.sampler.sample(seg_logit, seg_label)
         else:
             seg_weight = None
 
         seg_label_ori = seg_label_ori.squeeze(1)
-        # seg_label_last3frame = seg_label_last3frame.squeeze(1)
-        # seg_label_lastframe = seg_label_lastframe.squeeze(1)
-        
-        # if(not (np.unique(seg_label_ori.cpu()) == np.unique(seg_label_ori.cpu())).any()):
-        #     print(np.unique(seg_label_ori.cpu()),np.unique(seg_label_ori.cpu()))
-        #     exit()
-
-        # print(seg_logit_ori.shape,seg_label_ori.shape)
         
         loss['loss_seg'] = self.loss_decode(
             seg_logit_ori,
@@ -724,20 +581,6 @@ class BaseDecodeHead_clips(nn.Module, metaclass=ABCMeta):
             weight=seg_weight,
             ignore_index=self.ignore_index)
         
-        # loss['loss_seg'] = self.loss_decode(
-        #     seg_logit_ori,
-        #     seg_label_ori,
-        #     weight=seg_weight,
-        #     ignore_index=self.ignore_index)+self.loss_decode(
-        #     seg_logit_last3frame,
-        #     seg_label_last3frame,
-        #     weight=seg_weight,
-        #     ignore_index=self.ignore_index)+self.loss_decode(
-        #     seg_logit_lastframe,
-        #     seg_label_lastframe,
-        #     weight=seg_weight,
-        #     ignore_index=self.ignore_index
-        #     )
 
         loss['acc_seg'] = accuracy(seg_logit_ori, seg_label_ori)
 

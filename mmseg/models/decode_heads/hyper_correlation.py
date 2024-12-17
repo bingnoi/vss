@@ -523,35 +523,17 @@ class Corr(nn.Module):
             nn.ReLU(),
         ) if appearance_guidance_dim > 0 else None
         
-        # self.proj_
-        
-        # self.decoder_guidance_projection = nn.ModuleList([
-        #     nn.Sequential(
-        #         nn.Conv2d(d, dp, kernel_size=3, stride=1, padding=1),
-        #         nn.ReLU(),
-        #     ) for d, dp in zip(decoder_guidance_dims, decoder_guidance_proj_dims)
-        # ]) if decoder_guidance_dims[0] > 0 else None
-    
-        # self.decoder1 = Up(hidden_dim, decoder_dims[0])
-        # self.decoder2 = Up(decoder_dims[0], decoder_dims[1])
-        # self.head = nn.Conv2d(decoder_dims[1], 1, kernel_size=3, stride=1, padding=1)
         
         self.decodeh1 = decoder()
-        # self.decodeh2 = decoder()
-        # self.decodeh3 = decoder()
-        # self.decodeh4 = decoder()
     
     def correlation(self, img_feats, text_feats):
         img_feats = F.normalize(img_feats, dim=1) # B C H W
         text_feats = F.normalize(text_feats, dim=-1) # B T P C
-        # #print('qq',img_feats.shape,text_feats.shape) 
-        # 1,256,60,60 * 1,111,80,256 = 1,80,111,60,60
         corr = torch.einsum('bchw, btpc -> bpthw', img_feats, text_feats)
         return corr
     
     def corr_embed(self, x):
         B = x.shape[0]
-        # #print('x',x.shape)
         corr_embed = rearrange(x, 'B P T H W -> (B T) P H W') #111 80 60 60
         
         corr_embed = self.conv1(corr_embed) #111 128 60 60
@@ -561,64 +543,19 @@ class Corr(nn.Module):
     def fusion(self,x):
         B = x.shape[0]
         for i in range(B-1,1,-1):
-            # #print(x[i].shape,x[i-1].shape)
             q = rearrange(x[i],'P T H W -> P T (H W)')
             k = rearrange(x[i-1],'P T H W -> P T (H W)')
             
-            # q = x[i].contiguous().reshape(x[i].shape[0],x[i].shape[1],-1)
-            # k = x[i-1].contiguous().reshape(x[i-1].shape[0],x[i-1].shape[1],-1)
-            
-            # #print('atten1',q.shape,k.shape)
             atten = torch.matmul(q,k.transpose(-1,-2))
-            # #print('atten',atten.shape,k.shape)
             fused = torch.matmul(atten,k).squeeze(0)
             x[i] = rearrange(fused,'P T (H W) -> P T H W',H=24)
             
         return x
         
     
-    # def conv_decoder(self, x):
-    #     B = x.shape[0]
-    #     corr_embed = rearrange(x, 'B C T H W -> (B T) C H W')
-    #     #print('q',corr_embed.shape)
-    #     corr_embed = self.decoder1(corr_embed)
-    #     corr_embed = self.decoder2(corr_embed)
-    #     corr_embed = self.head(corr_embed)
-    #     corr_embed = rearrange(corr_embed, '(B T) () H W -> B T H W', B=B)
-    #     return corr_embed
-    
     def forward(self,fuse_img,img,c4,text):
         
-        # fuse_img是融合信息
-        # img是未融合的 c4也是未融合的
-        
-        # text = self.text_linear(text)
-        
         h,w = img[0].shape[-2],img[0].shape[-1]
-        
-        # for i in range(self.num_feature_scale):
-        #     for j in range(self.num_frames):
-        #         #print(img[i][j].shape,text.shape)
-        #         if i==0:
-        #             correlation_c1.append(self.correlation(img[i][j],text[j,:]))
-        #         elif i==1:
-        #             correlation_c2.append(self.correlation(img[i][j],text[j,:]))
-        #         elif i==2:
-        #             correlation_c3.append(self.correlation(img[i][j],text[j,:]))
-        #         elif i==3:
-        #             correlation_c4.append(self.correlation(img[i][j],text[j,:]))
-        
-        # #print(img[0].unsqueeze(0).shape,text[0,:].shape)
-        
-        # for i in range(self.num_feature_scale):
-        #     # #print(img[i].shape,text.shape)
-        #     if i==0:
-        #         correlation_c1.append(self.corr_embed(self.correlation(img[i].unsqueeze(0),text[i,:])))
-        
-        # #print([i.shape for i in img],text.shape)
-        # torch.Size([5, 256, 48, 48]) torch.Size([5, 124, 80, 256])
-        
-        # img = self.fusion(img)
         
         corr_emd_map = self.correlation(img,text)
         
@@ -643,135 +580,11 @@ class Corr(nn.Module):
         proj_fuse_img = self.proj_img_1(fuse_img)
         proj_fuse_img =F.interpolate(proj_fuse_img,size=(72,72),mode='bilinear',align_corners=False)
         
-        # #print('ppp',proj_fuse_img.shape,proj_c4.shape)
         
-        # corr_embeds = torch.cat([correlation_c1[0]],dim=0)
-        # res_corr_map = []
-        
-        # correlation_c1[0].permute(2,3,)
-        # #print(corr_embeds.shape,text.shape,correlation_c1[0].shape)
-        # exit()
-        
-        # b,h*w,c * b,c,h*w = b,h*w,h*w b,h*w,c = b,h*w,c
-        # b,c,h,w * b,t,c = b,c,t,h,w (t,h*w,c)*(t,c) = t,h*w,c
-        # corr_emd_map = rearrange(corr_emd_map,'B C T H W -> (H W) (B T) C')
-        
-        # #print(corr_emd_map.shape,text.shape,)
-        
-        # supp_feats_1 = torch.matmul(correlation_c1[0],text[0,:])
-        # supp_feats_1 = torch.einsum('b t c, t c -> b t c',corr_emd_map,text)
-        # supp_feats_1 = rearrange(supp_feats_1,'(H W) T C -> C T H W',H=h).unsqueeze(0)
-        
-        #print('1',corr_emd_map.shape,proj_c4.shape,text.shape)
         for layer in self.layers:
             corr_embed = layer(corr_emd_map,proj_c4,text)
             
-        # #print('cor',corr_embed.shape)
-        # corr_embed = self.fusion(corr_embed)
         
         logit = F.interpolate(self.decodeh1(corr_embed,proj_fuse_img),size=(120,120),mode='bilinear',align_corners=False) 
-        
-        # for layer in self.layers:
-        #     corr_embed = layer(corr_embeds,text)
-            
-        # correlation_map = torch.split(corr_embed,split_size_or_sections=1,dim=0)
-        # logit1 = F.interpolate(self.decodeh1(correlation_map[0]),size=(120,120),mode='bilinear',align_corners=False) 
-        # logit2 = F.interpolate(self.decodeh2(correlation_map[1]),size=(120,120),mode='bilinear',align_corners=False)
-        # logit3 = F.interpolate(self.decodeh3(correlation_map[2]),size=(120,120),mode='bilinear',align_corners=False)
-        # logit4 = F.interpolate(self.decodeh4(correlation_map[3]),size=(120,120),mode='bilinear',align_corners=False)
-        
-        # logit = torch.cat([logit1,logit2,logit3,logit4],dim=0)
-        # # #print(img.shape,text.shape,corr.shape,corr_embed.shape,logit.shape)
 
         return logit
-        
-        # elif len(img)==4:
-        #     correlation_c1 = []
-        #     correlation_c2 = []
-        #     correlation_c3 = []
-        #     correlation_c4 = []
-            
-        #     text = self.text_linear(text)
-            
-        #     h,w = img[0].shape[-2],img[0].shape[-1]
-            
-        #     # for i in range(self.num_feature_scale):
-        #     #     for j in range(self.num_frames):
-        #     #         #print(img[i][j].shape,text.shape)
-        #     #         if i==0:
-        #     #             correlation_c1.append(self.correlation(img[i][j],text[j,:]))
-        #     #         elif i==1:
-        #     #             correlation_c2.append(self.correlation(img[i][j],text[j,:]))
-        #     #         elif i==2:
-        #     #             correlation_c3.append(self.correlation(img[i][j],text[j,:]))
-        #     #         elif i==3:
-        #     #             correlation_c4.append(self.correlation(img[i][j],text[j,:]))
-            
-        #     # #print(img[0].shape,text[0,:].shape)
-            
-        #     for i in range(self.num_feature_scale):
-        #         # #print(img[i].shape,text.shape)
-        #         if i==0:
-        #             correlation_c1.append(self.corr_embed(self.correlation(img[i],text[i,:])))
-        #         elif i==1:
-        #             correlation_c2.append(self.corr_embed(self.correlation(img[i],text[i,:])))
-        #         elif i==2:
-        #             correlation_c3.append(self.corr_embed(self.correlation(img[i],text[i,:])))
-        #         elif i==3:
-        #             correlation_c4.append(self.corr_embed(self.correlation(img[i],text[i,:])))
-            
-        #     if self.text_guidance_projection is not None:
-        #         text = text.mean(dim=-2)
-        #         text = text / text.norm(dim=-1, keepdim=True)
-        #         text = self.text_guidance_projection(text)
-            
-        #     corr_embeds = torch.cat([correlation_c1[0],correlation_c2[0],correlation_c3[0],correlation_c4[0]],dim=0)
-            
-        #     res_corr_map = []
-            
-        #     # correlation_c1[0].permute(2,3,)
-        #     # #print(corr_embeds.shape,text.shape,correlation_c1[0].shape)
-        #     # exit()
-            
-        #     # b,h*w,c * b,c,h*w = b,h*w,h*w b,h*w,c = b,h*w,c
-        #     # b,c,h,w * b,t,c = b,c,t,h,w (t,h*w,c)*(t,c) = t,h*w,c
-        #     correlation_c1[0] = rearrange(correlation_c1[0],'B C T H W -> (H W) (B T) C')
-        #     correlation_c2[0] = rearrange(correlation_c2[0],'B C T H W -> (H W) (B T) C')
-        #     correlation_c3[0] = rearrange(correlation_c3[0],'B C T H W -> (H W) (B T) C')
-        #     correlation_c4[0] = rearrange(correlation_c4[0],'B C T H W -> (H W) (B T) C')
-            
-        #     # #print(correlation_c1[0].shape,text[0,:].shape,)
-        #     # supp_feats_1 = torch.matmul(correlation_c1[0],text[0,:])
-            
-        #     supp_feats_1 = torch.einsum('b t c, t c -> b t c',correlation_c1[0],text[0,:])
-        #     supp_feats_2 = torch.einsum('b t c, t c -> b t c',correlation_c2[0],text[0,:])
-        #     supp_feats_3 = torch.einsum('b t c, t c -> b t c',correlation_c3[0],text[0,:])
-        #     supp_feats_4 = torch.einsum('b t c, t c -> b t c',correlation_c4[0],text[0,:])
-            
-        #     # #print(supp_feats_1.shape)
-            
-        #     supp_feats_1 = rearrange(supp_feats_1,'(H W) T C -> C T H W',H=h).unsqueeze(0)
-        #     supp_feats_2 = rearrange(supp_feats_2,'(H W) T C -> C T H W',H=h).unsqueeze(0)
-        #     supp_feats_3 = rearrange(supp_feats_3,'(H W) T C -> C T H W',H=h).unsqueeze(0)
-        #     supp_feats_4 = rearrange(supp_feats_4,'(H W) T C -> C T H W',H=h).unsqueeze(0)
-            
-        #     logit1 = F.interpolate(self.decodeh1(supp_feats_1),size=(120,120),mode='bilinear',align_corners=False) 
-        #     logit2 = F.interpolate(self.decodeh2(supp_feats_2),size=(120,120),mode='bilinear',align_corners=False)
-        #     logit3 = F.interpolate(self.decodeh3(supp_feats_3),size=(120,120),mode='bilinear',align_corners=False)
-        #     logit4 = F.interpolate(self.decodeh4(supp_feats_4),size=(120,120),mode='bilinear',align_corners=False)
-            
-        #     logit = torch.cat([logit1,logit2,logit3,logit4],dim=0)
-            
-        #     # for layer in self.layers:
-        #     #     corr_embed = layer(corr_embeds,text)
-                
-        #     # correlation_map = torch.split(corr_embed,split_size_or_sections=1,dim=0)
-        #     # logit1 = F.interpolate(self.decodeh1(correlation_map[0]),size=(120,120),mode='bilinear',align_corners=False) 
-        #     # logit2 = F.interpolate(self.decodeh2(correlation_map[1]),size=(120,120),mode='bilinear',align_corners=False)
-        #     # logit3 = F.interpolate(self.decodeh3(correlation_map[2]),size=(120,120),mode='bilinear',align_corners=False)
-        #     # logit4 = F.interpolate(self.decodeh4(correlation_map[3]),size=(120,120),mode='bilinear',align_corners=False)
-            
-        #     # logit = torch.cat([logit1,logit2,logit3,logit4],dim=0)
-        #     # # #print(img.shape,text.shape,corr.shape,corr_embed.shape,logit.shape)
-
-        #     return logit
